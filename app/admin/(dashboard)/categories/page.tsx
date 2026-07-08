@@ -1,0 +1,10 @@
+import React from 'react';
+
+export default function CategoriesPage() {
+  return (
+    <div className="bg-[#1e1e2d] border border-[#2b2b40] rounded-lg p-6">
+      <h1 className="text-xl font-bold text-white mb-4">Quản lý danh mục</h1>
+      <p className="text-[#9899ac]">Tính năng đang được phát triển...</p>
+    </div>
+  );
+}
