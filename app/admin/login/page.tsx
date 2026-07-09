@@ -6,33 +6,44 @@ import { useRouter } from 'next/navigation';
 import styles from './login.module.css';
 
 export default function AdminLogin() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
-
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await res.json();
-
-    if (!res.ok) {
-      setError(data.error ?? 'Đăng nhập thất bại.');
-      setLoading(false);
+    
+    if (!email || !password) {
+      setError('Vui lòng điền đầy đủ email và mật khẩu.');
       return;
     }
 
-    router.push('/admin');
-    router.refresh();
-  }
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Đăng nhập thất bại.');
+      } else {
+        router.push('/admin');
+        router.refresh();
+      }
+    } catch (err) {
+      setError('Đã xảy ra lỗi kết nối.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className={styles.container}>
@@ -47,18 +58,25 @@ export default function AdminLogin() {
 
           <h1 className={styles.title}>Login to system</h1>
           <p className={styles.subtitle}>
-            Please enter your login information
+            Please enter your login information<br />
+            or <a href="#" className={styles.link}>click here</a> to registration
           </p>
+
+          {error && (
+            <div className="mb-4 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg p-3 animate-pulse">
+              ⚠️ {error}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit}>
             <div className={`${styles.formGroup} ${styles.usernameGroup}`}>
               <input
                 type="email"
                 className={styles.input}
-                placeholder="Email"
+                placeholder="Email Address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
+                disabled={loading}
               />
             </div>
 
@@ -69,15 +87,9 @@ export default function AdminLogin() {
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                required
+                disabled={loading}
               />
             </div>
-
-            {error && (
-              <p style={{ color: '#e53e3e', fontSize: '0.875rem', marginBottom: '0.75rem' }}>
-                {error}
-              </p>
-            )}
 
             <label className={styles.rememberMe}>
               <input type="checkbox" className={styles.checkbox} />
@@ -85,7 +97,7 @@ export default function AdminLogin() {
             </label>
 
             <button type="submit" className={styles.loginBtn} disabled={loading}>
-              {loading ? 'Đang đăng nhập...' : 'Log In'}
+              {loading ? 'Logging In...' : 'Log In'}
             </button>
           </form>
         </div>

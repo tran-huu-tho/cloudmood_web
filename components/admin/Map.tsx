@@ -59,19 +59,19 @@ export default function Map() {
     }
   };
 
-  // Default center (e.g., Riga as in the design)
-  const position: [number, number] = [56.9496, 24.1052];
+  // Default center (Cần Thơ - Đại học Kỹ thuật - Công nghệ)
+  const position: [number, number] = [10.0467807, 105.7680453];
 
   return (
     <div className="relative w-full h-full" onWheel={handleWheel}>
       <div 
-        className={`absolute inset-0 bg-black/40 z-[1000] flex items-center justify-center text-white text-3xl font-normal transition-opacity duration-300 pointer-events-none ${showMessage ? 'opacity-100' : 'opacity-0'}`}
+        className={`absolute inset-0 bg-black/40 z-[1000] flex items-center justify-center text-white text-2xl font-normal transition-opacity duration-300 pointer-events-none ${showMessage ? 'opacity-100' : 'opacity-0'} px-6 text-center`}
       >
-        Use ctrl + scroll to zoom the map
+        Nhấn giữ Ctrl + cuộn chuột để phóng to/thu nhỏ bản đồ
       </div>
       <MapContainer 
         center={position} 
-        zoom={11} 
+        zoom={18} 
         scrollWheelZoom={false}
         style={{ height: '100%', width: '100%', borderRadius: '0.5rem' }}
       >
@@ -83,9 +83,9 @@ export default function Map() {
         />
         <Marker position={position}>
           <Popup>
-            <div className="text-gray-800">
-              <strong>Adminator HQ</strong><br />
-              Riga, Latvia
+            <div className="text-gray-800 font-sans">
+              <strong>Trụ sở chính CloudMood</strong><br />
+              Đại học Kỹ Thuật - Công Nghệ Cần Thơ
             </div>
           </Popup>
         </Marker>

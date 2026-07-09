@@ -3,15 +3,14 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   Home,
   Users,
   MapPin,
   FolderTree,
   BarChart3,
-  MessageSquare,
-  LogOut
+  MessageSquare
 } from 'lucide-react';
 
 const navItems = [
@@ -25,36 +24,26 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-
-  async function handleLogout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/admin/login');
-    router.refresh();
-  }
 
   return (
-    <aside className="w-64 bg-white text-gray-600 min-h-screen flex flex-col border-r border-gray-200">
+    <aside className="w-80 bg-white text-gray-600 min-h-screen flex flex-col border-r border-gray-200 shrink-0">
       {/* Logo Area */}
-      <div className="h-16 flex items-center px-6 border-b border-gray-200">
-        <div className="w-8 h-8 rounded overflow-hidden flex items-center justify-center mr-3 shrink-0">
+      <div className="h-20 flex items-center px-8 border-b border-gray-200">
+        <div className="w-12 h-12 rounded overflow-hidden flex items-center justify-center mr-4 shrink-0">
           <Image 
             src="/logo-cloudmood.png" 
             alt="CloudMood Icon" 
-            width={32} 
-            height={32}
+            width={48} 
+            height={48}
             className="object-cover w-full h-full"
             priority
           />
         </div>
-        <span className="text-gray-900 font-semibold text-lg tracking-wide">CloudMood</span>
+        <span className="text-gray-900 font-bold text-2xl tracking-wide">CloudMood</span>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-6 px-4 space-y-1">
-        <p className="px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4 mt-2">
-          Workspace
-        </p>
+      <nav className="flex-1 py-8 px-6 space-y-4 overflow-y-auto">
 
         {navItems.map((item) => {
           const isActive = pathname === item.path;
@@ -62,29 +51,17 @@ export default function Sidebar() {
             <Link
               key={item.path}
               href={item.path}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${isActive
+              className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${isActive
                   ? 'bg-blue-50 text-blue-600'
                   : 'hover:bg-gray-100 hover:text-gray-900'
                 }`}
             >
-              <item.icon size={18} className={isActive ? "text-blue-600" : "text-gray-500"} />
-              <span className="text-sm font-medium">{item.name}</span>
+              <item.icon size={22} className={isActive ? "text-blue-600" : "text-gray-500"} />
+              <span className="text-base font-semibold">{item.name}</span>
             </Link>
           );
         })}
       </nav>
-
-      {/* Logout bottom */}
-      <div className="p-4 border-t border-gray-200">
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors hover:bg-red-50 hover:text-red-600 w-full text-left"
-        >
-          <LogOut size={18} className="text-gray-500" />
-          <span className="text-sm font-medium">Đăng xuất</span>
-        </button>
-      </div>
     </aside>
   );
 }
-

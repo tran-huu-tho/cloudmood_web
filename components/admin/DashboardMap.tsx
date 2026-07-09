@@ -7,7 +7,7 @@ const Map = dynamic(() => import('./Map'), {
   ssr: false,
   loading: () => (
     <div className="w-full h-[400px] bg-gray-100 rounded-lg animate-pulse flex items-center justify-center text-gray-500">
-      Loading map...
+      Đang tải bản đồ...
     </div>
   )
 });
