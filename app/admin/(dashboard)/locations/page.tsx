@@ -29,6 +29,67 @@ const getCategoryBadgeStyle = (categoryId: number) => {
   return styles[categoryId % styles.length];
 };
 
+const formatTimeToHHMM = (timeString: any) => {
+  if (!timeString) return '';
+  if (typeof timeString === 'string' && (timeString.includes('T') || timeString.includes('-'))) {
+    try {
+      const date = new Date(timeString);
+      if (!isNaN(date.getTime())) {
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${hours}:${minutes}`;
+      }
+    } catch (e) {
+      // Fallback
+    }
+  }
+  if (typeof timeString === 'string') {
+    const parts = timeString.split(':');
+    if (parts.length >= 2) {
+      return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+    }
+  }
+  return '';
+};
+
+const displayOpeningHours = (place: any) => {
+  const open = formatTimeToHHMM(place.openTime);
+  const close = formatTimeToHHMM(place.closeTime);
+  
+  if (open && close) {
+    return `${open} - ${close}`;
+  }
+
+  const rawHours = place.opening_hours || place.openingHours;
+
+  if (rawHours) {
+    try {
+      const hours = typeof rawHours === 'string'
+        ? JSON.parse(rawHours)
+        : rawHours;
+
+      if (hours && typeof hours === 'object') {
+        const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const currentDay = days[new Date().getDay()];
+        
+        if (hours[currentDay] && Array.isArray(hours[currentDay]) && hours[currentDay].length >= 2) {
+          return `${hours[currentDay][0]} - ${hours[currentDay][1]}`;
+        }
+        
+        for (const day of days) {
+          if (hours[day] && Array.isArray(hours[day]) && hours[day].length >= 2) {
+            return `${hours[day][0]} - ${hours[day][1]}`;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error parsing openingHours:', e);
+    }
+  }
+
+  return 'N/A - N/A';
+};
+
 export default function LocationsPage() {
   const supabase = createClient();
   const [places, setPlaces] = useState<Place[]>([]);
@@ -125,8 +186,25 @@ export default function LocationsPage() {
   };
 
   const handleOpenEdit = (place: Place) => {
+    // Nếu openTime/closeTime trống nhưng có openingHours, thử lấy giờ mặc định để điền vào form sửa
+    let defaultOpen = place.openTime || '';
+    let defaultClose = place.closeTime || '';
+    
+    if (!defaultOpen && !defaultClose) {
+      const parsed = displayOpeningHours(place);
+      if (parsed && parsed !== 'N/A - N/A') {
+        const parts = parsed.split(' - ');
+        if (parts.length === 2) {
+          defaultOpen = parts[0];
+          defaultClose = parts[1];
+        }
+      }
+    }
+
     setCurrentPlace({
       ...place,
+      openTime: defaultOpen,
+      closeTime: defaultClose,
       phone: place.phone || '',
       website: place.website || '',
       priceLevel: place.priceLevel || 'MODERATE',
@@ -367,7 +445,7 @@ export default function LocationsPage() {
                       <td className="px-6 py-4">
                         <p className="text-gray-900 text-xs font-medium">{formatPrice(place.price)}</p>
                         <p className="text-gray-500 text-[10px] mt-1">
-                          ⏱️ {place.openTime ? place.openTime.slice(0, 5) : 'N/A'} - {place.closeTime ? place.closeTime.slice(0, 5) : 'N/A'}
+                          ⏱️ {displayOpeningHours(place)}
                         </p>
                       </td>
                       <td className="px-6 py-4 text-right space-x-1 shrink-0">
@@ -608,7 +686,7 @@ export default function LocationsPage() {
                       <label className="text-sm font-semibold text-gray-700 block">Giờ mở cửa</label>
                       <input
                         type="time"
-                        value={currentPlace.openTime?.slice(0, 5) || ''}
+                        value={formatTimeToHHMM(currentPlace.openTime)}
                         onChange={(e) => setCurrentPlace({ ...currentPlace, openTime: e.target.value })}
                         disabled={modalLoading}
                         className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-4 py-2 bg-white focus:outline-none focus:border-blue-500"
@@ -618,7 +696,7 @@ export default function LocationsPage() {
                       <label className="text-sm font-semibold text-gray-700 block">Giờ đóng cửa</label>
                       <input
                         type="time"
-                        value={currentPlace.closeTime?.slice(0, 5) || ''}
+                        value={formatTimeToHHMM(currentPlace.closeTime)}
                         onChange={(e) => setCurrentPlace({ ...currentPlace, closeTime: e.target.value })}
                         disabled={modalLoading}
                         className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-4 py-2 bg-white focus:outline-none focus:border-blue-500"
