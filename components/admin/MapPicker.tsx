@@ -35,7 +35,7 @@ export default function MapPicker({ lat, lng, onChange }: MapPickerProps) {
   const defaultCenter: [number, number] = lat && lng ? [lat, lng] : [10.03022, 105.78753]; // default to Can Tho
 
   return (
-    <div className="w-full h-[400px] rounded-lg overflow-hidden border border-gray-200 shadow-inner relative z-10">
+    <div className="w-full h-full min-h-[400px] rounded-lg overflow-hidden border border-gray-200 shadow-inner relative z-10">
       <MapContainer 
         center={defaultCenter} 
         zoom={lat && lng ? 14 : 10} 
@@ -43,8 +43,8 @@ export default function MapPicker({ lat, lng, onChange }: MapPickerProps) {
         style={{ height: '100%', width: '100%' }}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          attribution='&copy; Google Maps'
+          url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
         />
         <LocationMarker lat={lat} lng={lng} onChange={onChange} />
       </MapContainer>

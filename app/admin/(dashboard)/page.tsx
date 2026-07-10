@@ -6,48 +6,7 @@ import DashboardMap from '@/components/admin/DashboardMap';
 import { Users, MapPin, Map as MapIcon, MessageSquare, Star } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
-const stats = [
-  { 
-    label: 'Số người dùng', 
-    value: '12,450', 
-    icon: Users, 
-    cardBg: 'bg-[#eef2ff]', 
-    iconBg: 'bg-[#e0e7ff]', 
-    iconColor: 'text-[#4f46e5]', 
-    textColor: 'text-[#6366f1]', 
-    valColor: 'text-[#3730a3]' 
-  },
-  { 
-    label: 'Số địa điểm', 
-    value: '842', 
-    icon: MapPin, 
-    cardBg: 'bg-[#fef3c7]', 
-    iconBg: 'bg-[#fde68a]', 
-    iconColor: 'text-[#d97706]', 
-    textColor: 'text-[#b45309]', 
-    valColor: 'text-[#78350f]' 
-  },
-  { 
-    label: 'Số plan đã lên', 
-    value: '3,210', 
-    icon: MapIcon, 
-    cardBg: 'bg-[#e0f2fe]', 
-    iconBg: 'bg-[#bae6fd]', 
-    iconColor: 'text-[#0284c7]', 
-    textColor: 'text-[#0369a1]', 
-    valColor: 'text-[#075985]' 
-  },
-  { 
-    label: 'Số góp ý và cmt', 
-    value: '5,892', 
-    icon: MessageSquare, 
-    cardBg: 'bg-[#ffe4e6]', 
-    iconBg: 'bg-[#fecdd3]', 
-    iconColor: 'text-[#e11d48]', 
-    textColor: 'text-[#be123c]', 
-    valColor: 'text-[#881337]' 
-  },
-];
+
 
 const mockReviews = [
   { 
@@ -85,19 +44,40 @@ export default function AdminDashboard() {
   const [places, setPlaces] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Dynamic counts state
+  const [userCount, setUserCount] = useState<number | null>(null);
+  const [placeCount, setPlaceCount] = useState<number | null>(null);
+  const [itineraryCount, setItineraryCount] = useState<number | null>(null);
+  const [reviewCount, setReviewCount] = useState<number | null>(null);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         const supabase = createClient();
-        const [reviewsRes, usersRes, placesRes] = await Promise.all([
+        const [reviewsRes, usersRes, placesRes, itinerariesCountRes, reviewsCountRes] = await Promise.all([
           supabase.from('Review').select('*').order('id', { ascending: false }).limit(3),
           supabase.from('User').select('id, fullName, email, avatar'),
           supabase.from('Place').select('id, name'),
+          supabase.from('Itinerary').select('*', { count: 'exact', head: true }),
+          supabase.from('Review').select('*', { count: 'exact', head: true }),
         ]);
-        if (reviewsRes.data && reviewsRes.data.length > 0) {
+
+        if (usersRes.data) {
+          setUsers(usersRes.data);
+          setUserCount(usersRes.data.length);
+        }
+        if (placesRes.data) {
+          setPlaces(placesRes.data);
+          setPlaceCount(placesRes.data.length);
+        }
+        if (reviewsRes.data) {
           setReviews(reviewsRes.data);
-          if (usersRes.data) setUsers(usersRes.data);
-          if (placesRes.data) setPlaces(placesRes.data);
+        }
+        if (itinerariesCountRes.count !== null) {
+          setItineraryCount(itinerariesCountRes.count);
+        }
+        if (reviewsCountRes.count !== null) {
+          setReviewCount(reviewsCountRes.count);
         }
       } catch (err) {
         console.error('Error fetching dashboard reviews:', err);
@@ -133,6 +113,49 @@ export default function AdminDashboard() {
       place: place || { name: 'Địa điểm không rõ' }
     };
   }) : mockReviews;
+
+  const stats = [
+    { 
+      label: 'Số người dùng', 
+      value: userCount !== null ? userCount.toLocaleString() : '...', 
+      icon: Users, 
+      cardBg: 'bg-[#eef2ff]', 
+      iconBg: 'bg-[#e0e7ff]', 
+      iconColor: 'text-[#4f46e5]', 
+      textColor: 'text-[#6366f1]', 
+      valColor: 'text-[#3730a3]' 
+    },
+    { 
+      label: 'Số địa điểm', 
+      value: placeCount !== null ? placeCount.toLocaleString() : '...', 
+      icon: MapPin, 
+      cardBg: 'bg-[#fef3c7]', 
+      iconBg: 'bg-[#fde68a]', 
+      iconColor: 'text-[#d97706]', 
+      textColor: 'text-[#b45309]', 
+      valColor: 'text-[#78350f]' 
+    },
+    { 
+      label: 'Số plan đã lên', 
+      value: itineraryCount !== null ? itineraryCount.toLocaleString() : '...', 
+      icon: MapIcon, 
+      cardBg: 'bg-[#e0f2fe]', 
+      iconBg: 'bg-[#bae6fd]', 
+      iconColor: 'text-[#0284c7]', 
+      textColor: 'text-[#0369a1]', 
+      valColor: 'text-[#075985]' 
+    },
+    { 
+      label: 'Số góp ý và cmt', 
+      value: reviewCount !== null ? reviewCount.toLocaleString() : '...', 
+      icon: MessageSquare, 
+      cardBg: 'bg-[#ffe4e6]', 
+      iconBg: 'bg-[#fecdd3]', 
+      iconColor: 'text-[#e11d48]', 
+      textColor: 'text-[#be123c]', 
+      valColor: 'text-[#881337]' 
+    },
+  ];
 
   return (
     <div className="space-y-6">

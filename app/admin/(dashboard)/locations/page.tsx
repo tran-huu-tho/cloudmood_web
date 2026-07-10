@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { createClient } from '@/lib/supabase/client';
 import { Place, Category } from '@/lib/supabase/types';
 import { Plus, Edit2, Trash2, Search, X, Loader2, MapPin, ExternalLink } from 'lucide-react';
+import { cleanAddress, formatPrice } from '@/lib/utils';
 
 const MapPicker = dynamic(() => import('@/components/admin/MapPicker'), {
   ssr: false,
@@ -49,7 +50,7 @@ export default function LocationsPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'create' | 'edit'>('create');
-  const [currentPlace, setCurrentPlace] = useState<Partial<Place>>({
+  const [currentPlace, setCurrentPlace] = useState<Partial<Place> & { amenitiesInput?: string }>({
     name: '',
     description: '',
     address: '',
@@ -60,6 +61,11 @@ export default function LocationsPage() {
     closeTime: '21:00',
     categoryId: null,
     image: '',
+    phone: '',
+    website: '',
+    priceLevel: 'MODERATE',
+    amenities: [],
+    amenitiesInput: '',
   });
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
@@ -107,6 +113,11 @@ export default function LocationsPage() {
       closeTime: '21:00',
       categoryId: categories[0]?.id || null,
       image: '',
+      phone: '',
+      website: '',
+      priceLevel: 'MODERATE',
+      amenities: [],
+      amenitiesInput: '',
     });
     setModalType('create');
     setModalError(null);
@@ -114,7 +125,14 @@ export default function LocationsPage() {
   };
 
   const handleOpenEdit = (place: Place) => {
-    setCurrentPlace(place);
+    setCurrentPlace({
+      ...place,
+      phone: place.phone || '',
+      website: place.website || '',
+      priceLevel: place.priceLevel || 'MODERATE',
+      amenities: place.amenities || [],
+      amenitiesInput: place.amenities ? place.amenities.join(', ') : '',
+    });
     setModalType('edit');
     setModalError(null);
     setIsModalOpen(true);
@@ -140,7 +158,13 @@ export default function LocationsPage() {
         openTime: currentPlace.openTime?.trim() || null,
         closeTime: currentPlace.closeTime?.trim() || null,
         categoryId: Number(currentPlace.categoryId),
-        image: currentPlace.image?.trim() || null,
+        image: currentPlace.image?.trim() || "",
+        phone: currentPlace.phone?.trim() || null,
+        website: currentPlace.website?.trim() || null,
+        priceLevel: currentPlace.priceLevel || 'MODERATE',
+        amenities: currentPlace.amenitiesInput
+          ? currentPlace.amenitiesInput.split(',').map((s) => s.trim()).filter(Boolean)
+          : [],
       };
 
       if (modalType === 'create') {
@@ -333,7 +357,7 @@ export default function LocationsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 max-w-xs">
-                        <p className="text-gray-900 text-xs truncate">{place.address}</p>
+                        <p className="text-gray-900 text-xs truncate">{cleanAddress(place.address)}</p>
                         <div className="flex items-center gap-1.5 text-gray-500 text-[10px] mt-1 font-mono">
                           <span>Lat: {place.latitude}</span>
                           <span>&bull;</span>
@@ -341,7 +365,7 @@ export default function LocationsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-gray-900 text-xs font-medium">{place.price || 'N/A'}</p>
+                        <p className="text-gray-900 text-xs font-medium">{formatPrice(place.price)}</p>
                         <p className="text-gray-500 text-[10px] mt-1">
                           ⏱️ {place.openTime ? place.openTime.slice(0, 5) : 'N/A'} - {place.closeTime ? place.closeTime.slice(0, 5) : 'N/A'}
                         </p>
@@ -502,6 +526,31 @@ export default function LocationsPage() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700 block">Số điện thoại</label>
+                      <input
+                        type="text"
+                        placeholder="VD: 0292 3890..."
+                        value={currentPlace.phone || ''}
+                        onChange={(e) => setCurrentPlace({ ...currentPlace, phone: e.target.value })}
+                        disabled={modalLoading}
+                        className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-4 py-2 bg-white focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700 block">Trang web</label>
+                      <input
+                        type="text"
+                        placeholder="VD: https://cloudmood.com..."
+                        value={currentPlace.website || ''}
+                        onChange={(e) => setCurrentPlace({ ...currentPlace, website: e.target.value })}
+                        disabled={modalLoading}
+                        className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-4 py-2 bg-white focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
                       <label className="text-sm font-semibold text-gray-700 block">Giá cả/Vé vào</label>
                       <input
                         type="text"
@@ -513,6 +562,24 @@ export default function LocationsPage() {
                       />
                     </div>
                     <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700 block">Mức giá</label>
+                      <select
+                        value={currentPlace.priceLevel || 'MODERATE'}
+                        onChange={(e) => setCurrentPlace({ ...currentPlace, priceLevel: e.target.value })}
+                        disabled={modalLoading}
+                        className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
+                      >
+                        <option value="FREE">Miễn phí</option>
+                        <option value="INEXPENSIVE">Giá rẻ</option>
+                        <option value="MODERATE">Trung bình</option>
+                        <option value="EXPENSIVE">Cao cấp</option>
+                        <option value="VERY_EXPENSIVE">Rất cao cấp</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
                       <label className="text-sm font-semibold text-gray-700 block">Ảnh minh họa (Link)</label>
                       <input
                         type="text"
@@ -523,15 +590,25 @@ export default function LocationsPage() {
                         className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-4 py-2 bg-white focus:outline-none focus:border-blue-500"
                       />
                     </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700 block">Tiện ích</label>
+                      <input
+                        type="text"
+                        placeholder="Cách nhau bằng dấu phẩy..."
+                        value={currentPlace.amenitiesInput || ''}
+                        onChange={(e) => setCurrentPlace({ ...currentPlace, amenitiesInput: e.target.value })}
+                        disabled={modalLoading}
+                        className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-4 py-2 bg-white focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <label className="text-sm font-semibold text-gray-700 block">Giờ mở cửa</label>
                       <input
-                        type="text"
-                        placeholder="VD: 07:00"
-                        value={currentPlace.openTime || ''}
+                        type="time"
+                        value={currentPlace.openTime?.slice(0, 5) || ''}
                         onChange={(e) => setCurrentPlace({ ...currentPlace, openTime: e.target.value })}
                         disabled={modalLoading}
                         className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-4 py-2 bg-white focus:outline-none focus:border-blue-500"
@@ -540,9 +617,8 @@ export default function LocationsPage() {
                     <div className="space-y-2">
                       <label className="text-sm font-semibold text-gray-700 block">Giờ đóng cửa</label>
                       <input
-                        type="text"
-                        placeholder="VD: 22:00"
-                        value={currentPlace.closeTime || ''}
+                        type="time"
+                        value={currentPlace.closeTime?.slice(0, 5) || ''}
                         onChange={(e) => setCurrentPlace({ ...currentPlace, closeTime: e.target.value })}
                         disabled={modalLoading}
                         className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-4 py-2 bg-white focus:outline-none focus:border-blue-500"
@@ -552,8 +628,8 @@ export default function LocationsPage() {
                 </div>
 
                 {/* Column 2: Coordinate & Map Picker */}
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-4 flex flex-col h-full">
+                  <div className="grid grid-cols-2 gap-3 shrink-0">
                     <div className="space-y-2">
                       <label className="text-sm font-semibold text-gray-700 block">Vĩ độ (Latitude)</label>
                       <input
@@ -578,13 +654,15 @@ export default function LocationsPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2 flex-1 flex flex-col">
                     <label className="text-sm font-semibold text-gray-700 block">Chọn vị trí trên bản đồ</label>
-                    <MapPicker
-                      lat={Number(currentPlace.latitude) || 10.03022}
-                      lng={Number(currentPlace.longitude) || 105.78753}
-                      onChange={handleCoordinateChange}
-                    />
+                    <div className="flex-1 w-full min-h-[400px]">
+                      <MapPicker
+                        lat={Number(currentPlace.latitude) || 10.03022}
+                        lng={Number(currentPlace.longitude) || 105.78753}
+                        onChange={handleCoordinateChange}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

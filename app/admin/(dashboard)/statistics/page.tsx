@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Place, Itinerary, Category } from '@/lib/supabase/types';
 import { Users, MapPin, Map as MapIcon, MessageSquare, Loader2, Star, TrendingUp, DollarSign } from 'lucide-react';
+import { cleanAddress } from '@/lib/utils';
 
 export default function StatisticsPage() {
   const supabase = createClient();
@@ -230,7 +231,7 @@ export default function StatisticsPage() {
                   <div key={place.id} className="flex justify-between items-center gap-4 hover:bg-gray-50/50 p-2 rounded-lg transition-colors">
                     <div className="min-w-0">
                       <h4 className="font-semibold text-gray-900 text-sm truncate">{place.name}</h4>
-                      <p className="text-gray-500 text-xs truncate mt-0.5">{place.address}</p>
+                      <p className="text-gray-500 text-xs truncate mt-0.5">{cleanAddress(place.address)}</p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <Star size={14} fill="#fbbf24" className="text-amber-400" />

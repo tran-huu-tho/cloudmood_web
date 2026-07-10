@@ -10,7 +10,8 @@ import {
   MapPin,
   FolderTree,
   BarChart3,
-  MessageSquare
+  MessageSquare,
+  Cloud
 } from 'lucide-react';
 
 const navItems = [
@@ -18,6 +19,7 @@ const navItems = [
   { name: 'Quản lý người dùng', path: '/admin/users', icon: Users },
   { name: 'Quản lý địa điểm', path: '/admin/locations', icon: MapPin },
   { name: 'Quản lý danh mục', path: '/admin/categories', icon: FolderTree },
+  { name: 'Quản lý thời tiết', path: '/admin/weather', icon: Cloud },
   { name: 'Thống kê', path: '/admin/statistics', icon: BarChart3 },
   { name: 'Quản lý đánh giá', path: '/admin/reviews', icon: MessageSquare },
 ];

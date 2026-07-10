@@ -76,10 +76,9 @@ export default function Map() {
         style={{ height: '100%', width: '100%', borderRadius: '0.5rem' }}
       >
         <ScrollHandler isCtrlDown={isCtrlDown} />
-        {/* Light theme tile layer */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          attribution='&copy; Google Maps'
+          url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
         />
         <Marker position={position}>
           <Popup>
