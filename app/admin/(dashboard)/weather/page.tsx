@@ -77,6 +77,7 @@ const POPULAR_CITIES = [
 
 export default function WeatherPage() {
   const supabase = createClient();
+  const [mounted, setMounted] = useState(false);
   const [monitoredList, setMonitoredList] = useState<WeatherCacheItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -136,6 +137,7 @@ export default function WeatherPage() {
   };
 
   useEffect(() => {
+    setMounted(true);
     fetchMonitoredCities();
   }, []);
 
@@ -324,8 +326,18 @@ export default function WeatherPage() {
   };
 
   const getRelativeTime = (timeStr: string) => {
+    if (!mounted) return '...';
     try {
-      const date = new Date(timeStr);
+      let formattedTimeStr = timeStr;
+      if (typeof timeStr === 'string') {
+        const hasTimezone = timeStr.endsWith('Z') || 
+                            timeStr.includes('+') || 
+                            (timeStr.includes('T') && timeStr.split('T')[1].includes('-'));
+        if (!hasTimezone) {
+          formattedTimeStr = timeStr + 'Z';
+        }
+      }
+      const date = new Date(formattedTimeStr);
       return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
     } catch {
       return timeStr;

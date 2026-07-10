@@ -1,9 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import bcrypt from 'bcryptjs';
 import { jwtVerify } from 'jose';
-import { createClient } from '@/lib/supabase/server';
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
+const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:3000';
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,7 +12,11 @@ export async function POST(req: NextRequest) {
     }
 
     const { payload } = await jwtVerify(token, secret);
-    const userId = Number(payload.sub);
+    const backendToken = payload.backendToken as string;
+
+    if (!backendToken) {
+      return NextResponse.json({ error: 'Không tìm thấy thông tin xác thực backend.' }, { status: 401 });
+    }
 
     const { fullName, oldPassword, newPassword, confirmPassword } = await req.json();
 
@@ -21,11 +24,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Tên hiển thị không được để trống.' }, { status: 400 });
     }
 
-    const updateData: any = {
-      fullName: fullName.trim()
-    };
+    // 1. Call NestJS backend to update profile name
+    const profileRes = await fetch(`${backendUrl}/auth/profile`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${backendToken}`,
+      },
+      body: JSON.stringify({
+        fullName: fullName.trim(),
+      }),
+    });
 
-    // If changing password, perform validations
+    const profileData = await profileRes.json();
+    if (!profileRes.ok) {
+      return NextResponse.json(
+        { error: profileData.message || 'Không thể cập nhật thông tin cá nhân.' },
+        { status: profileRes.status }
+      );
+    }
+
+    // 2. Call NestJS backend to change password if input is provided
     const hasPasswordInput = oldPassword || newPassword || confirmPassword;
     if (hasPasswordInput) {
       if (!oldPassword || !newPassword || !confirmPassword) {
@@ -42,42 +61,30 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Mật khẩu mới phải có ít nhất 6 ký tự.' }, { status: 400 });
       }
 
-      // Query current password from database
-      const supabase = await createClient();
-      const { data: user, error: userError } = await supabase
-        .from('User')
-        .select('password')
-        .eq('id', userId)
-        .single();
+      const passwordRes = await fetch(`${backendUrl}/auth/password`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${backendToken}`,
+        },
+        body: JSON.stringify({
+          currentPassword: oldPassword,
+          newPassword: newPassword,
+        }),
+      });
 
-      if (userError || !user) {
-        return NextResponse.json({ error: 'Không thể tìm thấy tài khoản người dùng.' }, { status: 404 });
+      const passwordData = await passwordRes.json();
+      if (!passwordRes.ok) {
+        return NextResponse.json(
+          { error: passwordData.message || 'Mật khẩu cũ không chính xác hoặc không hợp lệ.' },
+          { status: passwordRes.status }
+        );
       }
-
-      const isOldPasswordCorrect = await bcrypt.compare(oldPassword, user.password ?? '');
-      if (!isOldPasswordCorrect) {
-        return NextResponse.json({ error: 'Mật khẩu cũ không chính xác.' }, { status: 400 });
-      }
-
-      // Hash new password securely
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(newPassword, salt);
-      updateData.password = hashedPassword;
-    }
-
-    const supabase = await createClient();
-    const { error } = await supabase
-      .from('User')
-      .update(updateData)
-      .eq('id', userId);
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('Error updating profile:', err);
+    console.error('Error updating profile through backend:', err);
     return NextResponse.json({ error: 'Đã xảy ra lỗi hệ thống khi cập nhật.' }, { status: 500 });
   }
 }

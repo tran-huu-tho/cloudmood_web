@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
 import { SignJWT } from 'jose';
-import { createClient } from '@/lib/supabase/server';
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
+const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:3000';
 
 export async function POST(req: Request) {
   try {
@@ -13,32 +12,35 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Email và mật khẩu không được để trống.' }, { status: 400 });
     }
 
-    const supabase = await createClient();
-    const { data: users, error } = await supabase
-      .from('User')
-      .select('id, email, password, role, fullName, avatar')
-      .eq('email', email)
-      .limit(1);
+    // Call the NestJS backend login endpoint
+    const backendRes = await fetch(`${backendUrl}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    });
 
-    if (error || !users || users.length === 0) {
-      return NextResponse.json({ error: 'Email hoặc mật khẩu không đúng.' }, { status: 401 });
+    const backendData = await backendRes.json();
+
+    if (!backendRes.ok) {
+      return NextResponse.json(
+        { error: backendData.message || 'Email hoặc mật khẩu không đúng.' },
+        { status: backendRes.status }
+      );
     }
 
-    const user = users[0];
+    const { user, token: backendToken } = backendData;
 
     if (!user.role) {
       return NextResponse.json({ error: 'Tài khoản không có quyền truy cập.' }, { status: 403 });
-    }
-
-    const valid = await bcrypt.compare(password, user.password ?? '');
-    if (!valid) {
-      return NextResponse.json({ error: 'Email hoặc mật khẩu không đúng.' }, { status: 401 });
     }
 
     const token = await new SignJWT({
       sub: String(user.id),
       email: user.email,
       fullName: user.fullName,
+      backendToken: backendToken,
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
@@ -54,7 +56,8 @@ export async function POST(req: Request) {
     });
 
     return response;
-  } catch {
-    return NextResponse.json({ error: 'Đã xảy ra lỗi.' }, { status: 500 });
+  } catch (error) {
+    console.error('Error forwarding login to backend:', error);
+    return NextResponse.json({ error: 'Đã xảy ra lỗi kết nối với máy chủ.' }, { status: 500 });
   }
 }

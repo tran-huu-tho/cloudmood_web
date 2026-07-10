@@ -4,7 +4,7 @@ import React, { useEffect, useState, useTransition, startTransition } from 'reac
 import dynamic from 'next/dynamic';
 import { createClient } from '@/lib/supabase/client';
 import { Place, Category } from '@/lib/supabase/types';
-import { Plus, Edit2, Trash2, Search, X, Loader2, MapPin, ExternalLink } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, X, Loader2, MapPin, ExternalLink, Check } from 'lucide-react';
 import { cleanAddress, formatPrice } from '@/lib/utils';
 
 const MapPicker = dynamic(() => import('@/components/admin/MapPicker'), {
@@ -99,6 +99,20 @@ export default function LocationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startFilterTransition] = useTransition();
+
+  // Toast notification state
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
+    show: false,
+    message: '',
+    type: 'success'
+  });
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, show: false }));
+    }, 4000);
+  };
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -249,6 +263,7 @@ export default function LocationsPage() {
         const { data, error } = await supabase.from('Place').insert([payload]).select();
         if (error) throw error;
         if (data) setPlaces([data[0], ...places]);
+        showToast('Thêm địa điểm thành công!', 'success');
       } else {
         const { data, error } = await supabase
           .from('Place')
@@ -258,6 +273,7 @@ export default function LocationsPage() {
         if (error) throw error;
         const updatedRow = (data && data.length > 0) ? data[0] : { ...currentPlace, ...payload } as Place;
         setPlaces(places.map((p) => (p.id === currentPlace.id ? updatedRow : p)));
+        showToast('Cập nhật địa điểm thành công!', 'success');
       }
       setIsModalOpen(false);
     } catch (err: any) {
@@ -280,8 +296,9 @@ export default function LocationsPage() {
       if (error) throw error;
       setPlaces(places.filter((p) => p.id !== deletingId));
       setIsDeleteOpen(false);
+      showToast('Xóa địa điểm thành công!', 'success');
     } catch (err: any) {
-      alert(err.message || 'Lỗi khi xóa địa điểm.');
+      showToast(err.message || 'Lỗi khi xóa địa điểm.', 'error');
     } finally {
       setDeleteLoading(false);
       setDeletingId(null);
@@ -327,6 +344,16 @@ export default function LocationsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className={`fixed top-24 right-6 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-[9999] animate-in fade-in slide-in-from-top-4 duration-200 ${
+          toast.type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'
+        }`}>
+          {toast.type === 'success' ? <Check size={20} className="shrink-0" /> : <X size={20} className="shrink-0" />}
+          <span className="text-base font-semibold">{toast.message}</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>

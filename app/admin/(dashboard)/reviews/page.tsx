@@ -3,7 +3,7 @@
 import React, { useEffect, useState, startTransition } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Review } from '@/lib/supabase/types';
-import { Trash2, Search, Loader2, Star, MessageSquare } from 'lucide-react';
+import { Trash2, Search, Loader2, Star, MessageSquare, Check, X } from 'lucide-react';
 
 interface ReviewUser {
   id: number;
@@ -26,6 +26,20 @@ export default function ReviewsPage() {
   const [ratingFilter, setRatingFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Toast notification state
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
+    show: false,
+    message: '',
+    type: 'success'
+  });
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, show: false }));
+    }, 4000);
+  };
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -77,12 +91,18 @@ export default function ReviewsPage() {
     if (deletingId === null) return;
     setDeleteLoading(true);
     try {
-      const { error } = await supabase.from('Review').delete().eq('id', deletingId);
-      if (error) throw error;
+      const res = await fetch(`/api/reviews?id=${deletingId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Lỗi khi xóa đánh giá.');
+      }
       setReviews(reviews.filter((r) => r.id !== deletingId));
       setIsDeleteOpen(false);
+      showToast('Xóa đánh giá thành công!', 'success');
     } catch (err: any) {
-      alert(err.message || 'Lỗi khi xóa đánh giá.');
+      showToast(err.message || 'Lỗi khi xóa đánh giá.', 'error');
     } finally {
       setDeleteLoading(false);
       setDeletingId(null);
@@ -141,6 +161,16 @@ export default function ReviewsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className={`fixed top-24 right-6 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-[9999] animate-in fade-in slide-in-from-top-4 duration-200 ${
+          toast.type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'
+        }`}>
+          {toast.type === 'success' ? <Check size={20} className="shrink-0" /> : <X size={20} className="shrink-0" />}
+          <span className="text-base font-semibold">{toast.message}</span>
+        </div>
+      )}
+
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Quản lý đánh giá và góp ý</h1>
