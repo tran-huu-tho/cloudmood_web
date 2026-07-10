@@ -32,7 +32,7 @@ export type Place = {
   phone: string | null;
   website: string | null;
   priceLevel: string | null;
-  amenities: string[] | null;
+  subCategories?: string[] | null;
   lastSyncedAt: string | null;
 };
 

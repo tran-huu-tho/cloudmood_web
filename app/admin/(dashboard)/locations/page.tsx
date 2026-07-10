@@ -111,7 +111,7 @@ export default function LocationsPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'create' | 'edit'>('create');
-  const [currentPlace, setCurrentPlace] = useState<Partial<Place> & { amenitiesInput?: string }>({
+  const [currentPlace, setCurrentPlace] = useState<Partial<Place> & { subCategoriesInput?: string }>({
     name: '',
     description: '',
     address: '',
@@ -125,8 +125,8 @@ export default function LocationsPage() {
     phone: '',
     website: '',
     priceLevel: 'MODERATE',
-    amenities: [],
-    amenitiesInput: '',
+    subCategories: [],
+    subCategoriesInput: '',
   });
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
@@ -177,8 +177,8 @@ export default function LocationsPage() {
       phone: '',
       website: '',
       priceLevel: 'MODERATE',
-      amenities: [],
-      amenitiesInput: '',
+      subCategories: [],
+      subCategoriesInput: '',
     });
     setModalType('create');
     setModalError(null);
@@ -208,8 +208,8 @@ export default function LocationsPage() {
       phone: place.phone || '',
       website: place.website || '',
       priceLevel: place.priceLevel || 'MODERATE',
-      amenities: place.amenities || [],
-      amenitiesInput: place.amenities ? place.amenities.join(', ') : '',
+      subCategories: place.subCategories || [],
+      subCategoriesInput: place.subCategories ? place.subCategories.join(', ') : '',
     });
     setModalType('edit');
     setModalError(null);
@@ -240,8 +240,8 @@ export default function LocationsPage() {
         phone: currentPlace.phone?.trim() || null,
         website: currentPlace.website?.trim() || null,
         priceLevel: currentPlace.priceLevel || 'MODERATE',
-        amenities: currentPlace.amenitiesInput
-          ? currentPlace.amenitiesInput.split(',').map((s) => s.trim()).filter(Boolean)
+        subCategories: currentPlace.subCategoriesInput
+          ? currentPlace.subCategoriesInput.split(',').map((s) => s.trim()).filter(Boolean)
           : [],
       };
 
@@ -669,12 +669,12 @@ export default function LocationsPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700 block">Tiện ích</label>
+                      <label className="text-sm font-semibold text-gray-700 block">Danh mục phụ</label>
                       <input
                         type="text"
                         placeholder="Cách nhau bằng dấu phẩy..."
-                        value={currentPlace.amenitiesInput || ''}
-                        onChange={(e) => setCurrentPlace({ ...currentPlace, amenitiesInput: e.target.value })}
+                        value={currentPlace.subCategoriesInput || ''}
+                        onChange={(e) => setCurrentPlace({ ...currentPlace, subCategoriesInput: e.target.value })}
                         disabled={modalLoading}
                         className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-4 py-2 bg-white focus:outline-none focus:border-blue-500"
                       />
