@@ -32,3 +32,149 @@ body {
   color: var(--foreground);
   font-family: 'SDK SC Web Heavy', var(--font-geist-sans), sans-serif;
 }
+
+/* Admin Dark Mode Overrides via CSS Variables & Utility Overrides */
+.dark {
+  --background: #0f172a;
+  --foreground: #ffffff;
+
+  /* Tailwind CSS v4 Theme Colors Override */
+  --color-white: #1e293b; /* Card & Topbar backgrounds */
+  --color-gray-50: #0f172a; /* Page background */
+  --color-slate-50: #1e293b; /* Monitored cities card backgrounds */
+  
+  --color-gray-100: #1e293b;
+  --color-slate-100: #1e293b;
+  --color-gray-200: #334155; /* border slate-700 */
+  --color-slate-200: #334155;
+
+  /* Make all text colors white in dark mode */
+  --color-gray-950: #ffffff;
+  --color-gray-900: #ffffff;
+  --color-gray-800: #ffffff;
+  --color-gray-700: #ffffff;
+  --color-gray-600: #ffffff;
+  --color-gray-500: #ffffff;
+  --color-gray-400: #ffffff;
+  --color-gray-300: #ffffff;
+
+  --color-slate-950: #ffffff;
+  --color-slate-900: #ffffff;
+  --color-slate-800: #ffffff;
+  --color-slate-700: #ffffff;
+  --color-slate-600: #ffffff;
+  --color-slate-500: #ffffff;
+  --color-slate-400: #ffffff;
+  --color-slate-300: #ffffff;
+}
+
+.dark body {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+}
+
+.dark header,
+.dark .bg-white,
+.dark .bg-white\/50,
+.dark .bg-white\/90 {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #ffffff !important;
+}
+
+.dark .text-gray-950,
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-gray-700,
+.dark .text-gray-600,
+.dark .text-gray-500,
+.dark .text-gray-400,
+.dark .text-slate-950,
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700,
+.dark .text-slate-600,
+.dark .text-slate-500,
+.dark .text-slate-400 {
+  color: #ffffff !important;
+}
+
+.dark .bg-blue-50 {
+  background-color: rgba(37, 99, 235, 0.2) !important;
+}
+
+.dark .text-blue-600 {
+  color: #60a5fa !important;
+}
+
+.dark .hover\:bg-gray-100:hover,
+.dark .hover\:bg-slate-100:hover,
+.dark .hover\:bg-slate-50:hover {
+  background-color: #1e293b !important;
+}
+
+.dark .hover\:text-gray-900:hover,
+.dark .hover\:text-slate-900:hover {
+  color: #ffffff !important;
+}
+
+.dark .bg-gray-50,
+.dark .bg-slate-50 {
+  background-color: #0f172a !important;
+}
+
+.dark .bg-gray-50\/30,
+.dark .bg-slate-50\/30 {
+  background-color: rgba(15, 23, 42, 0.3) !important;
+}
+
+.dark .border-gray-200,
+.dark .border-gray-150,
+.dark .border-slate-100,
+.dark .border-slate-200 {
+  border-color: #334155 !important;
+}
+
+.dark input, 
+.dark select, 
+.dark textarea {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+  border-color: #334155 !important;
+}
+
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus,
+.dark .focus\:bg-white:focus {
+  background-color: #0f172a !important;
+  border-color: #3b82f6 !important;
+  color: #ffffff !important;
+}
+
+.dark .weather-monitor-card {
+  background-color: rgba(30, 41, 59, 0.3) !important;
+  border-color: #334155 !important;
+}
+
+.dark .weather-monitor-card:hover {
+  background-color: #1e293b !important;
+  border-color: #475569 !important;
+}
+
+.dark .hover\:bg-blue-50:hover {
+  background-color: rgba(37, 99, 235, 0.25) !important;
+}
+
+.dark .hover\:bg-rose-50:hover {
+  background-color: rgba(244, 63, 94, 0.25) !important;
+}
+
+.dark tr:hover {
+  background-color: rgba(30, 41, 59, 0.5) !important;
+}
+
+.dark .shadow-xl,
+.dark .shadow-2xl {
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5) !important;
+}

@@ -46,6 +46,13 @@ interface TravelSuggestions {
   activities: string[];
   categories: string[];
   tips: string[];
+  places?: Array<{
+    id: string;
+    name: string;
+    category: string;
+    address: string;
+    reason: string;
+  }>;
 }
 
 interface CurrentWeatherResponse {
@@ -87,6 +94,19 @@ export default function WeatherPage() {
   const [candidates, setCandidates] = useState<any[] | null>(null);
   const [refreshingCityId, setRefreshingCityId] = useState<string | number | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  // Confirm Modal state
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmModalConfig, setConfirmModalConfig] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+
+  const triggerConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setConfirmModalConfig({ title, message, onConfirm });
+    setShowConfirmModal(true);
+  };
 
   // Toast notification state
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
@@ -285,26 +305,56 @@ export default function WeatherPage() {
 
   // Stop monitoring / delete from cache
   const handleDelete = async (cityName: string, id: string | number) => {
-    if (!confirm(`Bạn có chắc muốn ngừng giám sát thời tiết tại ${cityName}?`)) return;
-    
-    try {
-      const { error } = await supabase
-        .from('WeatherCache')
-        .delete()
-        .eq('id', id);
+    triggerConfirm(
+      'Ngừng giám sát thời tiết',
+      `Bạn có chắc chắn muốn ngừng giám sát thời tiết tại ${cityName}?`,
+      async () => {
+        try {
+          const { error } = await supabase
+            .from('WeatherCache')
+            .delete()
+            .eq('id', id);
 
-      if (error) throw error;
+          if (error) throw error;
 
-      setMonitoredList(prev => prev.filter(item => item.id !== id));
-      
-      if (searchResult && searchResult.cityName.toLowerCase() === cityName.toLowerCase()) {
-        setSearchResult(null);
+          setMonitoredList(prev => prev.filter(item => item.id !== id));
+          
+          if (searchResult && searchResult.cityName.toLowerCase() === cityName.toLowerCase()) {
+            setSearchResult(null);
+          }
+
+          showToast(`Đã ngừng giám sát thời tiết cho ${cityName}.`, 'success');
+        } catch (err: any) {
+          showToast(err.message || 'Lỗi khi xóa giám sát.', 'error');
+        }
       }
+    );
+  };
 
-      showToast(`Đã ngừng giám sát thời tiết cho ${cityName}.`, 'success');
-    } catch (err: any) {
-      showToast(err.message || 'Lỗi khi xóa giám sát.', 'error');
-    }
+  const handleDeleteAll = async () => {
+    triggerConfirm(
+      'Xóa toàn bộ giám sát',
+      'Bạn có chắc chắn muốn ngừng giám sát toàn bộ các thành phố trong danh sách? Hành động này sẽ làm sạch danh sách và không thể hoàn tác.',
+      async () => {
+        setLoadingList(true);
+        try {
+          const { error } = await supabase
+            .from('WeatherCache')
+            .delete()
+            .neq('id', -1);
+
+          if (error) throw error;
+
+          setMonitoredList([]);
+          setSearchResult(null);
+          showToast('Đã xóa toàn bộ danh sách thành phố giám sát.', 'success');
+        } catch (err: any) {
+          showToast(err.message || 'Lỗi khi xóa danh sách.', 'error');
+        } finally {
+          setLoadingList(false);
+        }
+      }
+    );
   };
 
   // Helper to map weather condition string to React Icon component
@@ -415,7 +465,7 @@ export default function WeatherPage() {
                       setSearchQuery(city);
                       handleSearch(city);
                     }}
-                    className="px-3.5 py-1.5 bg-slate-50 hover:bg-blue-50 hover:text-blue-600 text-gray-600 font-semibold rounded-xl text-sm border border-slate-200 transition-colors cursor-pointer"
+                    className="px-3.5 py-1.5 bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 text-gray-600 dark:text-white font-semibold rounded-xl text-sm border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
                   >
                     {city}
                   </button>
@@ -603,6 +653,36 @@ export default function WeatherPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Real database places recommended */}
+                  {searchResult.suggestions.places && searchResult.suggestions.places.length > 0 && (
+                    <div className="space-y-3 pt-5 border-t border-slate-100">
+                      <h4 className="font-extrabold text-gray-800 flex items-center gap-2 text-sm uppercase tracking-wider">
+                        📍 Đề xuất địa điểm thực tế trong hệ thống
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {searchResult.suggestions.places.map((place: any, index: number) => (
+                          <div 
+                            key={index} 
+                            className="bg-slate-50 border border-slate-200/80 p-4 rounded-2xl flex flex-col justify-between hover:border-indigo-400 hover:shadow-xs transition-all duration-200"
+                          >
+                            <div className="space-y-1.5">
+                              <div className="flex justify-between items-start gap-2.5">
+                                <span className="font-extrabold text-slate-800 text-sm line-clamp-1">{place.name}</span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-extrabold border border-indigo-100 shrink-0">
+                                  {place.category}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 line-clamp-2">{place.address}</p>
+                            </div>
+                            <p className="text-xs text-indigo-900 bg-indigo-50/50 border border-indigo-100/30 p-2.5 rounded-xl mt-3 italic leading-relaxed font-semibold">
+                              "{place.reason}"
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -617,28 +697,38 @@ export default function WeatherPage() {
                 <Cloud className="text-blue-500 animate-pulse" size={22} />
                 Thành phố giám sát ({monitoredList.length})
               </h2>
+              {monitoredList.length > 0 && (
+                <button
+                  onClick={handleDeleteAll}
+                  className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-transparent hover:border-rose-100 px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+                  title="Xóa toàn bộ danh sách"
+                >
+                  <Trash2 size={13} />
+                  Xóa tất cả
+                </button>
+              )}
             </div>
 
             {loadingList ? (
               // Skeletons
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 flex gap-4 animate-pulse">
-                    <div className="w-10 h-10 rounded-full bg-slate-200 shrink-0" />
+                  <div key={i} className="p-4 bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-700 flex gap-4 animate-pulse">
+                    <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0" />
                     <div className="flex-1 space-y-2 py-1">
-                      <div className="h-4 bg-slate-200 rounded w-1/3" />
-                      <div className="h-3 bg-slate-200 rounded w-5/6" />
+                      <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/3" />
+                      <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-5/6" />
                     </div>
                   </div>
                 ))}
               </div>
             ) : monitoredList.length === 0 ? (
               // Empty state
-              <div className="py-12 flex flex-col items-center justify-center text-center text-slate-400 space-y-3">
-                <Cloud size={64} className="text-slate-300 stroke-[1.5]" />
+              <div className="py-12 flex flex-col items-center justify-center text-center text-slate-400 dark:text-slate-500 space-y-3">
+                <Cloud size={64} className="text-slate-300 dark:text-slate-700 stroke-[1.5]" />
                 <div>
-                  <h3 className="font-bold text-gray-700">Chưa có thành phố nào</h3>
-                  <p className="text-xs text-gray-400 mt-1 max-w-xs mx-auto">Hãy tìm kiếm thành phố bất kỳ ở khung bên trái. Hệ thống sẽ tự động thêm và theo dõi thời tiết tại đó.</p>
+                  <h3 className="font-bold text-gray-700 dark:text-slate-200">Chưa có thành phố nào</h3>
+                  <p className="text-xs text-gray-400 dark:text-slate-400 mt-1 max-w-xs mx-auto">Hãy tìm kiếm thành phố bất kỳ ở khung bên trái. Hệ thống sẽ tự động thêm và theo dõi thời tiết tại đó.</p>
                 </div>
               </div>
             ) : (
@@ -652,15 +742,15 @@ export default function WeatherPage() {
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDrop={(e) => handleDrop(e, index)}
                     onDragEnd={handleDragEnd}
-                    className={`p-4 bg-slate-50/50 hover:bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between gap-4 transition-all duration-200 group cursor-grab active:cursor-grabbing select-none ${
-                      draggedIndex === index ? 'opacity-40 border-dashed border-blue-300 bg-blue-50/20' : ''
+                    className={`weather-monitor-card p-4 bg-slate-50/50 dark:bg-slate-800/30 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-100 dark:border-slate-700 rounded-2xl flex items-center justify-between gap-4 transition-all duration-200 group cursor-grab active:cursor-grabbing select-none ${
+                      draggedIndex === index ? 'opacity-40 border-dashed border-blue-300 bg-blue-50/20 dark:bg-blue-900/20' : ''
                     }`}
                   >
                     <div className="flex items-center gap-4 min-w-0">
-                      <div className="text-slate-300 group-hover:text-slate-400 transition-colors cursor-grab shrink-0">
+                      <div className="text-slate-300 dark:text-slate-600 group-hover:text-slate-400 dark:group-hover:text-slate-500 transition-colors cursor-grab shrink-0">
                         <GripVertical size={16} />
                       </div>
-                      <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center shrink-0 border border-slate-100">
+                      <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-700">
                         {getWeatherIcon(item.condition, 24)}
                       </div>
                       <div className="min-w-0">
@@ -669,18 +759,18 @@ export default function WeatherPage() {
                             setSearchQuery(item.cityName);
                             handleSearch(item.cityName);
                           }}
-                          className="font-extrabold text-gray-900 truncate hover:text-blue-600 transition-colors cursor-pointer text-base animate-none"
+                          className="font-extrabold text-gray-900 dark:text-white truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer text-base animate-none"
                         >
                           {item.cityName}
                         </h4>
-                        <p className="text-xs text-slate-400 font-bold capitalize mt-0.5">{item.description}</p>
-                        <span className="text-[10px] text-gray-400 font-bold block mt-1">Cập nhật: {getRelativeTime(item.updatedAt)}</span>
+                        <p className="text-xs text-slate-400 dark:text-slate-200 font-bold capitalize mt-0.5">{item.description}</p>
+                        <span className="text-[10px] text-gray-400 dark:text-slate-300 font-bold block mt-1">Cập nhật: {getRelativeTime(item.updatedAt)}</span>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-3 shrink-0">
                       {/* Temperature tag */}
-                      <div className="flex items-center gap-0.5 bg-blue-50 border border-blue-100 text-blue-700 px-2.5 py-1 rounded-xl text-sm font-black">
+                      <div className="flex items-center gap-0.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-800/60 text-blue-700 dark:text-white px-2.5 py-1 rounded-xl text-sm font-black">
                         {item.temp.toFixed(1)}°C
                       </div>
 
@@ -690,7 +780,7 @@ export default function WeatherPage() {
                           onClick={() => handleRefresh(item.cityName, item.id)}
                           disabled={refreshingCityId === item.id}
                           title="Làm mới thời tiết"
-                          className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl cursor-pointer transition-colors active:scale-95 disabled:opacity-50"
+                          className="p-2 text-gray-500 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-xl cursor-pointer transition-colors active:scale-95 disabled:opacity-50"
                         >
                           <RefreshCw size={16} className={refreshingCityId === item.id ? 'animate-spin' : ''} />
                         </button>
@@ -698,7 +788,7 @@ export default function WeatherPage() {
                         <button
                           onClick={() => handleDelete(item.cityName, item.id)}
                           title="Ngừng giám sát"
-                          className="p-2 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl cursor-pointer transition-colors active:scale-95"
+                          className="p-2 text-gray-500 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-xl cursor-pointer transition-colors active:scale-95"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -710,25 +800,62 @@ export default function WeatherPage() {
             )}
             
             {/* Quick stats / note */}
-            <div className="space-y-4 pt-6 border-t border-slate-100">
+            <div className="space-y-4 pt-6 border-t border-slate-100 dark:border-slate-800">
               <button 
                 onClick={fetchMonitoredCities} 
-                className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-slate-50 hover:bg-slate-100 active:scale-98 transition-all text-slate-700 border border-slate-200 font-bold rounded-2xl cursor-pointer text-sm"
+                className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-98 transition-all text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold rounded-2xl cursor-pointer text-sm"
               >
                 <RefreshCw size={16} className={loadingList ? 'animate-spin' : ''} />
                 Làm mới danh sách
               </button>
 
-              <div className="text-xs text-slate-400 font-semibold leading-relaxed flex gap-2">
+              <div className="text-xs text-slate-400 dark:text-slate-200 font-semibold leading-relaxed flex gap-2">
                 <Info size={16} className="shrink-0 text-blue-500" />
                 <span>Dữ liệu thời tiết của các thành phố giám sát trên được lưu trữ đệm trong 15 phút. Nhấn nút xoay để cập nhật ngay.</span>
               </div>
             </div>
           </div>
         </div>
-
       </div>
 
+      {/* Custom Confirmation Modal */}
+      {showConfirmModal && confirmModalConfig && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-all duration-200">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-100 shadow-2xl space-y-5 animate-[scaleIn_0.2s_ease-out]">
+            <div className="flex gap-4 items-start">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                <AlertTriangle size={24} />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-lg font-black text-gray-900 leading-tight">
+                  {confirmModalConfig.title}
+                </h3>
+                <p className="text-sm text-slate-500 font-semibold leading-relaxed">
+                  {confirmModalConfig.message}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="px-5 py-2.5 bg-slate-50 hover:bg-slate-100 active:scale-95 text-slate-600 font-bold rounded-xl text-sm transition-all cursor-pointer border border-slate-200"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={() => {
+                  confirmModalConfig.onConfirm();
+                  setShowConfirmModal(false);
+                }}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold rounded-xl text-sm transition-all cursor-pointer shadow-sm shadow-rose-100"
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

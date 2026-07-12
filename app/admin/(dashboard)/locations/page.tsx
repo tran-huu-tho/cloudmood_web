@@ -723,6 +723,24 @@ export default function LocationsPage() {
                     </div>
                   </div>
 
+                  {/* Image Preview Box */}
+                  {currentPlace.image && (
+                    <div className="space-y-2">
+                      <span className="text-xs font-semibold text-gray-500 block">Xem trước ảnh minh họa:</span>
+                      <div className="relative w-full h-40 rounded-xl overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center group">
+                        <img 
+                          src={currentPlace.image} 
+                          alt="Xem trước địa điểm" 
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <label className="text-sm font-semibold text-gray-700 block">Giờ mở cửa</label>

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Place, Itinerary, Category } from '@/lib/supabase/types';
-import { Users, MapPin, Map as MapIcon, MessageSquare, Loader2, Star, TrendingUp, DollarSign } from 'lucide-react';
+import { Users, MapPin, Map as MapIcon, MessageSquare, Loader2, Star, TrendingUp } from 'lucide-react';
 import { cleanAddress } from '@/lib/utils';
 
 export default function StatisticsPage() {
@@ -84,10 +84,10 @@ export default function StatisticsPage() {
     return { name: cat.name || 'N/A', count, percentage };
   }).sort((a, b) => b.count - a.count);
 
-  // Top rated places (Rating >= 4.5)
+  // Top rated places (Filter for high quality places rating >= 4.5, then sort by review count/popularity descending)
   const topPlaces = [...places]
-    .filter((p) => p.rating !== null)
-    .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+    .filter((p) => p.rating !== null && p.rating >= 4.5)
+    .sort((a, b) => (b.userRatingCount || 0) - (a.userRatingCount || 0))
     .slice(0, 5);
 
   // Recent Itineraries
@@ -155,29 +155,28 @@ export default function StatisticsPage() {
           </div>
 
           {/* Travel Insights card */}
-          <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-xl p-6 shadow-md space-y-5">
+          <div className="bg-white border border-gray-200 text-gray-900 rounded-xl p-6 shadow-sm space-y-5">
             <div className="flex items-center gap-2">
-              <TrendingUp size={20} className="text-blue-200" />
-              <h3 className="font-bold text-base">Travel Insights</h3>
+              <TrendingUp size={20} className="text-indigo-600" />
+              <h3 className="font-bold text-gray-900 text-base">Travel Insights</h3>
             </div>
             <div className="space-y-4 text-sm">
-              <div className="flex justify-between items-center border-b border-white/10 pb-3">
-                <span className="text-white/80">Ngân sách trung bình/plan:</span>
-                <span className="font-mono font-bold flex items-center">
-                  <DollarSign size={14} />
+              <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                <span className="text-gray-500 font-semibold">Ngân sách trung bình/plan:</span>
+                <span className="font-mono font-bold text-gray-800">
                   {avgBudget.toLocaleString()} đ
                 </span>
               </div>
-              <div className="flex justify-between items-center border-b border-white/10 pb-3">
-                <span className="text-white/80">Bạn đồng hành phổ biến:</span>
-                <span className="font-bold">Friends (Bạn bè)</span>
+              <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                <span className="text-gray-500 font-semibold">Bạn đồng hành phổ biến:</span>
+                <span className="font-bold text-gray-800">Friends (Bạn bè)</span>
               </div>
               <div className="flex justify-between items-center pb-1">
-                <span className="text-white/80">Nơi được chọn nhiều nhất:</span>
-                <span className="font-bold">Cần Thơ 🌤️</span>
+                <span className="text-gray-500 font-semibold">Nơi được chọn nhiều nhất:</span>
+                <span className="font-bold text-gray-800">Cần Thơ 🌤️</span>
               </div>
             </div>
-            <div className="bg-white/10 border border-white/20 rounded-lg p-3 text-xs leading-relaxed text-white/90">
+            <div className="bg-indigo-50/50 border border-indigo-100 rounded-lg p-3 text-xs leading-relaxed text-indigo-950 font-medium">
               🌤️ Các địa điểm du lịch văn hóa - tự nhiên đang được du khách ưu tiên xây dựng lịch trình theo điều kiện thời tiết trong tuần.
             </div>
           </div>
