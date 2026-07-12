@@ -240,6 +240,22 @@ export default function LocationsPage() {
     setModalLoading(true);
     setModalError(null);
     try {
+      const dailyHours = currentPlace.openTime && currentPlace.closeTime 
+        ? [currentPlace.openTime.trim(), currentPlace.closeTime.trim()]
+        : null;
+
+      const openingHoursJson = dailyHours 
+        ? {
+            monday: dailyHours,
+            tuesday: dailyHours,
+            wednesday: dailyHours,
+            thursday: dailyHours,
+            friday: dailyHours,
+            saturday: dailyHours,
+            sunday: dailyHours
+          }
+        : null;
+
       const payload = {
         name: currentPlace.name.trim(),
         description: currentPlace.description?.trim() || null,
@@ -247,13 +263,12 @@ export default function LocationsPage() {
         latitude: Number(currentPlace.latitude) || 0,
         longitude: Number(currentPlace.longitude) || 0,
         price: currentPlace.price?.trim() || null,
-        openTime: currentPlace.openTime?.trim() || null,
-        closeTime: currentPlace.closeTime?.trim() || null,
         categoryId: Number(currentPlace.categoryId),
         image: currentPlace.image?.trim() || "",
         phone: currentPlace.phone?.trim() || null,
         website: currentPlace.website?.trim() || null,
         priceLevel: currentPlace.priceLevel || 'MODERATE',
+        openingHours: openingHoursJson,
         subCategories: currentPlace.subCategoriesInput
           ? currentPlace.subCategoriesInput.split(',').map((s) => s.trim()).filter(Boolean)
           : [],
@@ -392,7 +407,7 @@ export default function LocationsPage() {
                 const val = e.target.value;
                 startFilterTransition(() => setSelectedCategoryFilter(val));
               }}
-              className="bg-white text-gray-700 text-sm rounded-lg px-3 py-2 border border-gray-200 focus:outline-none focus:border-blue-500 w-full sm:w-48 cursor-pointer font-medium"
+              className="bg-white text-gray-700 text-sm rounded-lg px-3 py-2 border border-gray-200 focus:outline-none focus:border-blue-500 w-full sm:w-60 cursor-pointer font-medium"
             >
               <option value="all">Tất cả danh mục</option>
               {categories.map((c) => (

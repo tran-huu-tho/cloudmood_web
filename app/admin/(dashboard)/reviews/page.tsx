@@ -62,17 +62,42 @@ export default function ReviewsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [reviewsRes, usersRes, placesRes] = await Promise.all([
-        supabase.from('Review').select('*').order('id', { ascending: false }),
+      const [usersRes, placesRes] = await Promise.all([
         supabase.from('User').select('id, fullName, email, avatar'),
         supabase.from('Place').select('id, name'),
       ]);
 
-      if (reviewsRes.error) throw reviewsRes.error;
       if (usersRes.error) throw usersRes.error;
       if (placesRes.error) throw placesRes.error;
 
-      setReviews(reviewsRes.data || []);
+      // Fetch all reviews in batches of 1000 to bypass default PostgREST row limits
+      let allReviews: Review[] = [];
+      let from = 0;
+      const limit = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('Review')
+          .select('*')
+          .order('id', { ascending: false })
+          .range(from, from + limit - 1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allReviews = [...allReviews, ...data];
+          if (data.length < limit) {
+            hasMore = false;
+          } else {
+            from += limit;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+
+      setReviews(allReviews);
       setUsers(usersRes.data || []);
       setPlaces(placesRes.data || []);
     } catch (err: any) {
