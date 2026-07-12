@@ -23,7 +23,8 @@ import {
   Compass,
   ListTodo,
   AlertTriangle,
-  GripVertical
+  GripVertical,
+  Umbrella
 } from 'lucide-react';
 
 interface WeatherCacheItem {
@@ -37,6 +38,7 @@ interface WeatherCacheItem {
   condition: string;
   description: string;
   icon: string;
+  rainfall?: number;
   updatedAt: string;
 }
 
@@ -46,6 +48,9 @@ interface TravelSuggestions {
   activities: string[];
   categories: string[];
   tips: string[];
+  rainProbability?: number;
+  estimatedRainfall?: number;
+  rainForecast?: string;
   places?: Array<{
     id: string;
     name: string;
@@ -65,6 +70,7 @@ interface CurrentWeatherResponse {
   condition: string;
   description: string;
   icon: string;
+  rainfall?: number;
   updatedAt: string;
   suggestions: TravelSuggestions;
 }
@@ -554,7 +560,17 @@ export default function WeatherPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-4 text-sm font-medium">
+                {searchResult.suggestions.rainForecast && (
+                  <div className="p-3.5 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-start gap-2.5 text-xs text-blue-200 leading-relaxed font-semibold">
+                    <CloudRain size={16} className="shrink-0 text-blue-400 mt-0.5" />
+                    <div>
+                      <span className="text-slate-300 font-bold block mb-0.5">Nhận định dự báo mưa:</span>
+                      {searchResult.suggestions.rainForecast}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t border-white/10 pt-4 text-sm font-medium">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-blue-400">
                       <Droplets size={18} />
@@ -572,6 +588,26 @@ export default function WeatherPage() {
                     <div>
                       <span className="text-xs text-slate-400 block font-bold">SỨC GIÓ</span>
                       <span className="text-slate-200 font-extrabold">{searchResult.windSpeed} m/s</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-blue-400">
+                      <Umbrella size={18} />
+                    </div>
+                    <div>
+                      <span className="text-xs text-slate-400 block font-bold">LƯỢNG MƯA</span>
+                      <span className="text-slate-200 font-extrabold">{(searchResult.rainfall ?? 0).toFixed(1)} mm</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-blue-400">
+                      <CloudRain size={18} />
+                    </div>
+                    <div>
+                      <span className="text-xs text-slate-400 block font-bold">KHẢ NĂNG MƯA</span>
+                      <span className="text-slate-200 font-extrabold">{searchResult.suggestions.rainProbability ?? 0}%</span>
                     </div>
                   </div>
                 </div>

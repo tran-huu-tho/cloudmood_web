@@ -2,9 +2,13 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
-import { Search, Bell, Settings, User as UserIcon, LogOut, AlertTriangle, CheckCircle2, KeyRound, Sparkles, Trash2 } from 'lucide-react';
+import { Search, Bell, Settings, User as UserIcon, LogOut, AlertTriangle, CheckCircle2, KeyRound, Sparkles, Trash2, Menu } from 'lucide-react';
 
-export default function TopBar() {
+interface TopBarProps {
+  onMenuClick?: () => void;
+}
+
+export default function TopBar({ onMenuClick }: TopBarProps) {
   interface NotificationItem {
     id: number;
     type: 'warning' | 'rotation' | 'info';
@@ -19,7 +23,7 @@ export default function TopBar() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(3);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   
   const [localToast, setLocalToast] = useState<{ show: boolean; message: string; type: 'success' | 'info' }>({ show: false, message: '', type: 'success' });
@@ -57,7 +61,7 @@ export default function TopBar() {
 
   const fetchNotifications = async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/admin/notifications');
+      const res = await fetch('/api/admin/notifications');
       if (res.ok) {
         const data = await res.json();
         setNotifications(data);
@@ -170,7 +174,7 @@ export default function TopBar() {
 
   const handleMarkAllAsRead = async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/admin/notifications/read-all', { method: 'POST' });
+      const res = await fetch('/api/admin/notifications/read-all', { method: 'POST' });
       if (res.ok) {
         setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
         setUnreadCount(0);
@@ -183,7 +187,7 @@ export default function TopBar() {
 
   const handleClearNotifications = async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/admin/notifications', { method: 'DELETE' });
+      const res = await fetch('/api/admin/notifications', { method: 'DELETE' });
       if (res.ok) {
         setNotifications([]);
         setUnreadCount(0);
@@ -204,7 +208,14 @@ export default function TopBar() {
         </div>
       )}
 
-      {/* Left placeholder to balance the layout and keep the search centered */}
+      {/* Left placeholder / Menu trigger */}
+      <button 
+        onClick={onMenuClick}
+        className="lg:hidden p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-slate-100 border border-transparent hover:border-slate-200/60 cursor-pointer mr-4"
+        title="Mở menu"
+      >
+        <Menu size={22} />
+      </button>
       <div className="w-80 hidden lg:block"></div>
  
       {/* Search Bar centered */}

@@ -58,7 +58,7 @@ export default function AIChatSidebar({ isOpen, onClose }: AIChatSidebarProps) {
         parts: [{ text: m.text }]
       }));
 
-      const res = await fetch('http://localhost:3000/admin/ai/chat', {
+      const res = await fetch('/admin/ai/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -107,7 +107,7 @@ export default function AIChatSidebar({ isOpen, onClose }: AIChatSidebarProps) {
   const handleDeleteReview = async (reviewId: string, messageId: string, widgetIndex: number) => {
     if (!confirm('Bạn có chắc chắn muốn xóa nhận xét này không?')) return;
     try {
-      const res = await fetch(`http://localhost:3000/admin/ai/chat`, {
+      const res = await fetch(`/admin/ai/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
