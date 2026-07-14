@@ -220,8 +220,8 @@ export default function AdminDashboard() {
               <div>
                 <h2 className="text-lg font-bold text-gray-900">Đánh giá từ người dùng</h2>
               </div>
-              <Link href="/admin/reviews" className="text-blue-600 hover:text-blue-500 text-sm font-medium transition-colors">
-                Xem tất cả &rarr;
+              <Link href="/admin/locations" className="text-blue-600 hover:text-blue-500 text-sm font-medium transition-colors">
+                Xem địa điểm &rarr;
               </Link>
             </div>
 

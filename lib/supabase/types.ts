@@ -12,6 +12,7 @@ export type UserRow = {
 export type Category = {
   id: number;
   name: string | null;
+  iconCode?: number | null;
 };
 
 export type Place = {
@@ -33,6 +34,7 @@ export type Place = {
   website: string | null;
   priceLevel: string | null;
   subCategories?: string[] | null;
+  openingHours?: any | null;
   lastSyncedAt: string | null;
 };
 
@@ -42,6 +44,12 @@ export type Review = {
   comment: string | null;
   userId: number | null;
   placeId: number | null;
+  externalReviewId?: string | null;
+  authorName?: string | null;
+  authorAvatar?: string | null;
+  authorLocation?: string | null;
+  publishedDate?: string | null;
+  source?: string | null;
 };
 
 export type Itinerary = {

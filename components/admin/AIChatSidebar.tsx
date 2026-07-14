@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useTransition } from 'react';
 import { MessageSquare, X, Send, Loader2, Star, Trash2, CheckCircle2, AlertCircle, BarChart3, MapPin, Globe, Phone, ArrowUp } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { getCategoryIcon } from '@/app/admin/(dashboard)/categories/page';
 
 interface AIChatSidebarProps {
   isOpen: boolean;
@@ -183,10 +184,14 @@ export default function AIChatSidebar({ isOpen, onClose }: AIChatSidebarProps) {
               <div className="text-xs text-slate-500 font-bold mb-1">Cơ cấu danh mục địa điểm:</div>
               {(categoryStats || []).map((cat: any, i: number) => {
                 const percent = (cat.count / maxVal) * 100;
+                const IconComponent = getCategoryIcon(cat.iconCode);
                 return (
                   <div key={i} className="space-y-1">
-                    <div className="flex justify-between text-xs font-semibold text-slate-600">
-                      <span>{cat.name}</span>
+                    <div className="flex justify-between text-xs font-semibold text-slate-600 items-center">
+                      <span className="flex items-center gap-1">
+                        <IconComponent size={12} className="shrink-0 text-slate-400" />
+                        {cat.name}
+                      </span>
                       <span>{cat.count}</span>
                     </div>
                     <div className="w-full bg-slate-200/75 h-2 rounded-full overflow-hidden">

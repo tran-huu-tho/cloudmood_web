@@ -3,7 +3,35 @@
 import React, { useEffect, useState, startTransition } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Category } from '@/lib/supabase/types';
-import { Plus, Edit2, Trash2, Search, X, Loader2, Check } from 'lucide-react';
+import { 
+  Plus, Edit2, Trash2, Search, X, Loader2, Check,
+  Utensils, Hotel, Pizza, Coffee, ShoppingBag, Trees, Compass, GraduationCap, HelpCircle, LucideIcon,
+  Plane, Train, Bus, Sun, Wine, Landmark, MapPin
+} from 'lucide-react';
+
+export const PRESET_ICONS = [
+  { name: 'Nhà hàng', code: 983304, icon: Utensils },
+  { name: 'Khách sạn', code: 63483, icon: Hotel },
+  { name: 'Quán ăn', code: 63286, icon: Pizza },
+  { name: 'Cà phê', code: 63590, icon: Coffee },
+  { name: 'Mua sắm', code: 63603, icon: ShoppingBag },
+  { name: 'Công viên', code: 983118, icon: Trees },
+  { name: 'Điểm tham quan', code: 983198, icon: Compass },
+  { name: 'Trường học', code: 59404, icon: GraduationCap },
+  { name: 'Bãi biển', code: 60222, icon: Sun },
+  { name: 'Quán Bar/Club', code: 58352, icon: Wine },
+  { name: 'Bến xe', code: 58672, icon: Bus },
+  { name: 'Nhà ga tàu', code: 58736, icon: Train },
+  { name: 'Sân bay', code: 61275, icon: Plane },
+  { name: 'Ngân hàng', code: 58356, icon: Landmark },
+  { name: 'Khác', code: 58719, icon: MapPin },
+];
+
+export const getCategoryIcon = (iconCode: number | null | undefined): LucideIcon => {
+  if (!iconCode) return HelpCircle;
+  const match = PRESET_ICONS.find(item => item.code === iconCode);
+  return match ? match.icon : HelpCircle;
+};
 
 const getCategoryBadgeStyle = (categoryId: number) => {
   const styles = [
@@ -50,7 +78,7 @@ export default function CategoriesPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'create' | 'edit'>('create');
-  const [currentCategory, setCurrentCategory] = useState<Partial<Category>>({ name: '' });
+  const [currentCategory, setCurrentCategory] = useState<Partial<Category>>({ name: '', iconCode: null });
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
 
@@ -82,7 +110,7 @@ export default function CategoriesPage() {
   };
 
   const handleOpenCreate = () => {
-    setCurrentCategory({ name: '' });
+    setCurrentCategory({ name: '', iconCode: null });
     setModalType('create');
     setModalError(null);
     setIsModalOpen(true);
@@ -108,7 +136,10 @@ export default function CategoriesPage() {
       if (modalType === 'create') {
         const { data, error } = await supabase
           .from('Category')
-          .insert([{ name: currentCategory.name.trim() }])
+          .insert([{ 
+            name: currentCategory.name.trim(),
+            iconCode: currentCategory.iconCode || null
+          }])
           .select();
 
         if (error) throw error;
@@ -119,12 +150,19 @@ export default function CategoriesPage() {
       } else {
         const { data, error } = await supabase
           .from('Category')
-          .update({ name: currentCategory.name.trim() })
+          .update({ 
+            name: currentCategory.name.trim(),
+            iconCode: currentCategory.iconCode || null
+          })
           .eq('id', currentCategory.id!)
           .select();
 
         if (error) throw error;
-        const updatedRow = (data && data.length > 0) ? data[0] : { id: currentCategory.id!, name: currentCategory.name.trim() } as Category;
+        const updatedRow = (data && data.length > 0) ? data[0] : { 
+          id: currentCategory.id!, 
+          name: currentCategory.name.trim(),
+          iconCode: currentCategory.iconCode || null
+        } as Category;
         setCategories(
           categories.map((c) => (c && c.id === currentCategory.id ? updatedRow : c))
         );
@@ -283,30 +321,43 @@ export default function CategoriesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {paginatedCategories.map((category) => (
-                  <tr
-                    key={category.id}
-                    className="hover:bg-gray-50/50 transition-colors"
-                  >
-                    <td className="px-6 py-4 font-mono font-medium text-gray-500">
-                      #{category.id}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center text-xs font-bold px-2.5 py-1.5 rounded-full border ${getCategoryBadgeStyle(category.id)}`}>
-                        {category.name}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => handleOpenDelete(category.id)}
-                        className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
-                        title="Xóa"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {paginatedCategories.map((category) => {
+                  const IconComponent = getCategoryIcon(category.iconCode);
+                  return (
+                    <tr
+                      key={category.id}
+                      className="hover:bg-gray-50/50 transition-colors"
+                    >
+                      <td className="px-6 py-4 font-mono font-medium text-gray-500">
+                        #{category.id}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-full border ${getCategoryBadgeStyle(category.id)}`}>
+                          <IconComponent size={14} className="shrink-0" />
+                          {category.name}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-1">
+                          <button
+                            onClick={() => handleOpenEdit(category)}
+                            className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
+                            title="Sửa"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleOpenDelete(category.id)}
+                            className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
+                            title="Xóa"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -388,6 +439,35 @@ export default function CategoriesPage() {
                   disabled={modalLoading}
                   className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-4 py-2.5 bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-700 block">
+                  Biểu tượng danh mục (Icon)
+                </label>
+                <div className="grid grid-cols-5 gap-1.5 pt-1">
+                  {PRESET_ICONS.map((preset) => {
+                    const PresetIcon = preset.icon;
+                    const isSelected = currentCategory.iconCode === preset.code;
+                    return (
+                      <button
+                        key={preset.code}
+                        type="button"
+                        onClick={() => {
+                          setCurrentCategory({ ...currentCategory, iconCode: preset.code });
+                        }}
+                        className={`flex flex-col items-center justify-center p-1.5 border rounded-lg transition-all cursor-pointer ${
+                          isSelected 
+                            ? 'border-blue-600 bg-blue-50 text-blue-600 ring-2 ring-blue-100 font-bold' 
+                            : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        <PresetIcon size={18} className="mb-0.5" />
+                        <span className="text-[9px] text-center truncate w-full">{preset.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">

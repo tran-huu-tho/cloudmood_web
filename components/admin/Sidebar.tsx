@@ -22,7 +22,6 @@ const navItems = [
   { name: 'Quản lý danh mục', path: '/admin/categories', icon: FolderTree },
   { name: 'Quản lý thời tiết', path: '/admin/weather', icon: Cloud },
   { name: 'Thống kê', path: '/admin/statistics', icon: BarChart3 },
-  { name: 'Quản lý đánh giá', path: '/admin/reviews', icon: MessageSquare },
 ];
 
 interface SidebarProps {

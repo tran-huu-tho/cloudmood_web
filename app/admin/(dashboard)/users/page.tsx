@@ -3,7 +3,8 @@
 import React, { useEffect, useState, startTransition } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { UserRow } from '@/lib/supabase/types';
-import { Search, X, Loader2, Shield, Eye, Lock, Unlock, Calendar, Mail, Check } from 'lucide-react';
+import { Search, X, Loader2, Shield, Eye, EyeOff, Lock, Unlock, Calendar, Mail, Check, Plus, User } from 'lucide-react';
+import bcrypt from 'bcryptjs';
 
 export default function UsersPage() {
   const supabase = createClient();
@@ -16,6 +17,18 @@ export default function UsersPage() {
   // View Modal State
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
+
+  // Create Modal State
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [newUser, setNewUser] = useState({
+    fullName: '',
+    email: '',
+    password: '',
+    role: false,
+  });
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -107,6 +120,60 @@ export default function UsersPage() {
     setIsViewModalOpen(true);
   };
 
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUser.fullName.trim() || !newUser.email.trim() || !newUser.password.trim()) {
+      setModalError('Vui lòng điền đầy đủ họ tên, email và mật khẩu.');
+      return;
+    }
+
+    setModalLoading(true);
+    setModalError(null);
+    try {
+      // Check if email already exists
+      const { data: existing, error: checkError } = await supabase
+        .from('User')
+        .select('id')
+        .eq('email', newUser.email.trim().toLowerCase())
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+      if (existing) {
+        throw new Error('Email này đã được sử dụng bởi tài khoản khác.');
+      }
+
+      // Hash password using bcryptjs
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(newUser.password.trim(), salt);
+
+      const payload = {
+        fullName: newUser.fullName.trim(),
+        email: newUser.email.trim().toLowerCase(),
+        password: hashedPassword,
+        avatar: '/default-avatar.jpg',
+        createdAt: new Date().toISOString(),
+        role: newUser.role,
+      };
+
+      const { data, error } = await supabase
+        .from('User')
+        .insert([payload])
+        .select();
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setUsers(prev => [data[0], ...prev]);
+        showToast('Thêm tài khoản người dùng thành công!', 'success');
+        setIsCreateModalOpen(false);
+      }
+    } catch (err: any) {
+      setModalError(err.message || 'Lỗi khi lưu thông tin người dùng.');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
   const getFormattedDate = (dateStr: string | null) => {
     if (!dateStr) return 'N/A';
     try {
@@ -120,6 +187,14 @@ export default function UsersPage() {
     } catch {
       return dateStr;
     }
+  };
+
+  const getAvatarUrl = (avatarUrl: string | null) => {
+    if (!avatarUrl) return '/default-avatar.jpg';
+    if (avatarUrl.includes('photo-1534528741775-53994a69daeb')) {
+      return '/default-avatar.jpg';
+    }
+    return avatarUrl;
   };
 
   // Filter out current logged in admin
@@ -172,6 +247,23 @@ export default function UsersPage() {
           <h1 className="text-2xl font-bold text-gray-900">Quản lý người dùng</h1>
           <p className="text-gray-500 text-sm mt-1">Danh sách tài khoản thành viên trong hệ thống (Không bao gồm tài khoản admin của bạn)</p>
         </div>
+        <button
+          onClick={() => {
+            setNewUser({
+              fullName: '',
+              email: '',
+              password: '',
+              role: false,
+            });
+            setShowPassword(false);
+            setModalError(null);
+            setIsCreateModalOpen(true);
+          }}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2.5 rounded-xl transition-all hover:shadow-md cursor-pointer text-sm"
+        >
+          <Plus size={18} />
+          Thêm người dùng
+        </button>
       </div>
 
       {/* Main Table Container */}
@@ -235,19 +327,11 @@ export default function UsersPage() {
                       <div className="flex items-center gap-3">
                         <div className="p-[2px] bg-gradient-to-tr from-pink-500 via-purple-500 to-blue-400 rounded-full shrink-0">
                           <div className="bg-white rounded-full p-[1.5px] w-10 h-10 overflow-hidden flex items-center justify-center text-sm">
-                            {user.avatar ? (
-                              <img
-                                src={user.avatar}
-                                alt={user.fullName || 'User'}
-                                className="object-cover w-full h-full rounded-full"
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-gray-105 flex items-center justify-center text-gray-400 rounded-full">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                </svg>
-                              </div>
-                            )}
+                            <img
+                              src={getAvatarUrl(user.avatar)}
+                              alt={user.fullName || 'User'}
+                              className="object-cover w-full h-full rounded-full"
+                            />
                           </div>
                         </div>
                         <div className="min-w-0">
@@ -372,19 +456,11 @@ export default function UsersPage() {
               {/* Avatar circle */}
               <div className="p-[3px] bg-gradient-to-tr from-pink-500 via-purple-500 to-blue-400 rounded-full shadow-md shrink-0">
                 <div className="bg-white rounded-full p-[2.5px] w-24 h-24 overflow-hidden flex items-center justify-center border border-gray-100">
-                  {selectedUser.avatar ? (
-                    <img
-                      src={selectedUser.avatar}
-                      alt={selectedUser.fullName || 'User'}
-                      className="object-cover w-full h-full rounded-full"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gray-105 flex items-center justify-center text-gray-400 rounded-full">
-                      <svg className="w-12 h-12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                    </div>
-                  )}
+                  <img
+                    src={getAvatarUrl(selectedUser.avatar)}
+                    alt={selectedUser.fullName || 'User'}
+                    className="object-cover w-full h-full rounded-full"
+                  />
                 </div>
               </div>
 
@@ -472,6 +548,135 @@ export default function UsersPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create User Modal */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-[2000] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-gray-250 animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-150 bg-gray-50/50">
+              <h3 className="font-bold text-gray-900 text-lg">Thêm người dùng mới</h3>
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 p-1.5 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleCreateUser}>
+              <div className="p-6 space-y-4">
+                {modalError && (
+                  <div className="text-xs text-red-650 bg-red-50 border border-red-200 rounded-lg p-3">
+                    {modalError}
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-gray-700 block">Họ và tên <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Nhập họ và tên..."
+                      value={newUser.fullName}
+                      onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
+                      disabled={modalLoading}
+                      required
+                      className="bg-white text-gray-900 text-sm rounded-lg pl-9 pr-4 py-2 border border-gray-300 focus:outline-none focus:border-blue-500 transition-colors w-full"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-gray-700 block">Địa chỉ Email <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="email"
+                      placeholder="email@example.com"
+                      value={newUser.email}
+                      onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                      disabled={modalLoading}
+                      required
+                      className="bg-white text-gray-900 text-sm rounded-lg pl-9 pr-4 py-2 border border-gray-300 focus:outline-none focus:border-blue-500 transition-colors w-full"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-gray-700 block">Mật khẩu <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Nhập mật khẩu..."
+                      value={newUser.password}
+                      onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                      disabled={modalLoading}
+                      required
+                      className="bg-white text-gray-900 text-sm rounded-lg pl-9 pr-10 py-2 border border-gray-300 focus:outline-none focus:border-blue-500 transition-colors w-full"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(prev => !prev)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-450 hover:text-gray-600 transition-colors p-0.5 rounded focus:outline-none cursor-pointer"
+                      title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <span className="text-sm font-semibold text-gray-750 block">Quyền Quản trị viên (Admin)</span>
+                      <span className="text-[10px] text-gray-500 block">Cho phép truy cập trang quản lý Admin Dashboard</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={newUser.role}
+                        onChange={(e) => setNewUser({ ...newUser, role: e.target.checked })}
+                        className="sr-only peer cursor-pointer"
+                      />
+                      <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal controls */}
+              <div className="px-6 py-4 border-t border-gray-150 bg-gray-50 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  disabled={modalLoading}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 bg-white rounded-xl font-bold text-sm hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={modalLoading}
+                  className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm transition-colors cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {modalLoading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Đang lưu...
+                    </>
+                  ) : (
+                    'Lưu tài khoản'
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

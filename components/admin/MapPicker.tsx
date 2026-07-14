@@ -35,7 +35,7 @@ export default function MapPicker({ lat, lng, onChange }: MapPickerProps) {
   const defaultCenter: [number, number] = lat && lng ? [lat, lng] : [10.03022, 105.78753]; // default to Can Tho
 
   return (
-    <div className="w-full h-full min-h-[400px] rounded-lg overflow-hidden border border-gray-200 shadow-inner relative z-10">
+    <div className="w-full h-full min-h-[200px] rounded-lg overflow-hidden border border-gray-200 shadow-inner relative z-10">
       <MapContainer 
         center={defaultCenter} 
         zoom={lat && lng ? 14 : 10} 
