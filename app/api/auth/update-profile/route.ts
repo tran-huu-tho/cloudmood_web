@@ -1,7 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { jwtVerify } from 'jose';
 
-const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
 const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:3000';
 
 export async function POST(req: NextRequest) {
@@ -11,28 +9,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Phiên đăng nhập đã hết hạn.' }, { status: 401 });
     }
 
-    const { payload } = await jwtVerify(token, secret);
-    const backendToken = payload.backendToken as string;
-
-    if (!backendToken) {
-      return NextResponse.json({ error: 'Không tìm thấy thông tin xác thực backend.' }, { status: 401 });
-    }
-
-    const { fullName, oldPassword, newPassword, confirmPassword } = await req.json();
+    const { fullName, avatarUrl, oldPassword, newPassword, confirmPassword } = await req.json();
 
     if (!fullName || fullName.trim() === '') {
       return NextResponse.json({ error: 'Tên hiển thị không được để trống.' }, { status: 400 });
     }
 
-    // 1. Call NestJS backend to update profile name
+    // 1. Call NestJS backend to update profile name and avatar
     const profileRes = await fetch(`${backendUrl}/auth/profile`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${backendToken}`,
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({
         fullName: fullName.trim(),
+        avatarUrl,
       }),
     });
 
@@ -65,7 +57,7 @@ export async function POST(req: NextRequest) {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${backendToken}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           currentPassword: oldPassword,

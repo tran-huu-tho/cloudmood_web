@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState, useTransition, startTransition } from 'react';
 import dynamic from 'next/dynamic';
-import { createClient } from '@/lib/supabase/client';
 import { Place, Category } from '@/lib/supabase/types';
 import { Plus, Edit2, Trash2, Search, X, Loader2, MapPin, ExternalLink, Check, Upload, Star, MessageSquare, Calendar, Clock, Image as ImageIcon, Info } from 'lucide-react';
 import { cleanAddress, formatPrice } from '@/lib/utils';
@@ -92,7 +91,6 @@ const displayOpeningHours = (place: any) => {
 };
 
 export default function LocationsPage() {
-  const supabase = createClient();
   const [places, setPlaces] = useState<Place[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -190,16 +188,19 @@ export default function LocationsPage() {
     setError(null);
     try {
       // Fetch both categories and places
-      const [categoriesRes, placesRes] = await Promise.all([
-        supabase.from('Category').select('*').order('name'),
-        supabase.from('Place').select('*').order('id', { ascending: false }),
+      const [categoriesData, placesData] = await Promise.all([
+        fetch('/api/admin/categories').then(r => {
+          if (!r.ok) throw new Error('Không thể tải danh sách danh mục.');
+          return r.json();
+        }),
+        fetch('/api/admin/places?limit=10000').then(r => {
+          if (!r.ok) throw new Error('Không thể tải danh sách địa điểm.');
+          return r.json();
+        }),
       ]);
 
-      if (categoriesRes.error) throw categoriesRes.error;
-      if (placesRes.error) throw placesRes.error;
-
-      setCategories(categoriesRes.data || []);
-      setPlaces(placesRes.data || []);
+      setCategories(categoriesData || []);
+      setPlaces(placesData.places || []);
     } catch (err: any) {
       setError(err.message || 'Lỗi khi kết nối cơ sở dữ liệu.');
     } finally {
@@ -211,16 +212,12 @@ export default function LocationsPage() {
     setReviewsLoading(true);
     setPhotosLoading(true);
     try {
-      const [reviewsRes, photosRes] = await Promise.all([
-        supabase.from('Review').select('*').eq('placeId', placeId).order('id', { ascending: false }),
-        supabase.from('PlacePhoto').select('*').eq('placeId', placeId).order('id', { ascending: false })
-      ]);
+      const res = await fetch(`/api/admin/places/${placeId}`);
+      if (!res.ok) throw new Error('Không thể tải chi tiết địa điểm.');
+      const data = await res.json();
       
-      if (reviewsRes.error) throw reviewsRes.error;
-      if (photosRes.error) throw photosRes.error;
-      
-      setPlaceReviews(reviewsRes.data || []);
-      setPlacePhotos(photosRes.data || []);
+      setPlaceReviews(data.reviews || []);
+      setPlacePhotos(data.photos || []);
     } catch (err: any) {
       console.error('Error fetching reviews/photos:', err.message);
     } finally {
@@ -416,19 +413,24 @@ export default function LocationsPage() {
       };
 
       if (modalType === 'create') {
-        const { data, error } = await supabase.from('Place').insert([payload]).select();
-        if (error) throw error;
-        if (data) setPlaces([data[0], ...places]);
+        const res = await fetch('/api/admin/places', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Lỗi khi lưu thông tin địa điểm.');
+        setPlaces([data, ...places]);
         showToast('Thêm địa điểm thành công!', 'success');
       } else {
-        const { data, error } = await supabase
-          .from('Place')
-          .update(payload)
-          .eq('id', currentPlace.id!)
-          .select();
-        if (error) throw error;
-        const updatedRow = (data && data.length > 0) ? data[0] : { ...currentPlace, ...payload } as Place;
-        setPlaces(places.map((p) => (p.id === currentPlace.id ? updatedRow : p)));
+        const res = await fetch(`/api/admin/places/${currentPlace.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Lỗi khi lưu thông tin địa điểm.');
+        setPlaces(places.map((p) => (p.id === currentPlace.id ? data : p)));
         showToast('Cập nhật địa điểm thành công!', 'success');
       }
       setIsModalOpen(false);
@@ -474,14 +476,17 @@ export default function LocationsPage() {
         authorAvatar: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(newReview.authorName)}`
       };
       
-      const { data, error } = await supabase.from('Review').insert([payload]).select();
-      if (error) throw error;
+      const res = await fetch(`/api/admin/places/${currentPlace.id}/reviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Lỗi khi thêm đánh giá.');
       
-      if (data) {
-        setPlaceReviews(prev => [data[0], ...prev]);
-        setNewReview({ authorName: '', rating: 5, comment: '', publishedDate: '', authorLocation: '' });
-        showToast('Thêm đánh giá thành công!', 'success');
-      }
+      setPlaceReviews(prev => [data, ...prev]);
+      setNewReview({ authorName: '', rating: 5, comment: '', publishedDate: '', authorLocation: '' });
+      showToast('Thêm đánh giá thành công!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Lỗi khi thêm đánh giá.', 'error');
     }
@@ -490,8 +495,10 @@ export default function LocationsPage() {
   const handleDeletePhoto = async (photoId: number) => {
     if (!confirm('Bạn có chắc chắn muốn xóa ảnh này?')) return;
     try {
-      const { error } = await supabase.from('PlacePhoto').delete().eq('id', photoId);
-      if (error) throw error;
+      const res = await fetch(`/api/admin/places/photos/${photoId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Lỗi khi xóa ảnh.');
       
       setPlacePhotos(prev => prev.filter(p => Number(p.id) !== photoId));
       showToast('Xóa hình ảnh thành công!', 'success');
@@ -509,21 +516,23 @@ export default function LocationsPage() {
     
     try {
       const payload = {
-        placeId: Number(currentPlace.id),
         urlOriginal: newPhoto.urlOriginal.trim(),
         urlThumbnail: newPhoto.urlThumbnail.trim() || newPhoto.urlOriginal.trim(),
         caption: newPhoto.caption.trim() || null,
         source: 'LOCAL'
       };
       
-      const { data, error } = await supabase.from('PlacePhoto').insert([payload]).select();
-      if (error) throw error;
+      const res = await fetch(`/api/admin/places/${currentPlace.id}/photos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Lỗi khi thêm hình ảnh.');
       
-      if (data) {
-        setPlacePhotos(prev => [data[0], ...prev]);
-        setNewPhoto({ urlOriginal: '', urlThumbnail: '', caption: '' });
-        showToast('Thêm hình ảnh thành công!', 'success');
-      }
+      setPlacePhotos(prev => [data, ...prev]);
+      setNewPhoto({ urlOriginal: '', urlThumbnail: '', caption: '' });
+      showToast('Thêm hình ảnh thành công!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Lỗi khi thêm hình ảnh.', 'error');
     }
@@ -642,13 +651,16 @@ export default function LocationsPage() {
           };
         });
 
-        const { data, error } = await supabase.from('Place').insert(validatedPlaces).select();
-        if (error) throw error;
+        const res = await fetch('/api/admin/places/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validatedPlaces),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Lỗi khi import file.');
 
-        if (data) {
-          setPlaces(prev => [...data, ...prev]);
-          showToast(`Import thành công ${data.length} địa điểm!`, 'success');
-        }
+        fetchData();
+        showToast(`Import thành công ${data.importedCount} địa điểm!`, 'success');
       } catch (err: any) {
         showToast(err.message || 'Lỗi khi import file.', 'error');
       }
@@ -666,8 +678,11 @@ export default function LocationsPage() {
     if (deletingId === null) return;
     setDeleteLoading(true);
     try {
-      const { error } = await supabase.from('Place').delete().eq('id', deletingId);
-      if (error) throw error;
+      const res = await fetch(`/api/admin/places/${deletingId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Lỗi khi xóa địa điểm.');
       setPlaces(places.filter((p) => p.id !== deletingId));
       setIsDeleteOpen(false);
       showToast('Xóa địa điểm thành công!', 'success');
@@ -913,17 +928,17 @@ export default function LocationsPage() {
                         <div className="mb-1">
                           <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg border ${
                             place.priceLevel === 'FREE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                            place.priceLevel === 'INEXPENSIVE' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                            (place.priceLevel === 'INEXPENSIVE' || place.priceLevel === 'CHEAP') ? 'bg-blue-50 text-blue-700 border-blue-200' :
                             place.priceLevel === 'MODERATE' ? 'bg-orange-50 text-orange-700 border-orange-200' :
                             place.priceLevel === 'EXPENSIVE' ? 'bg-pink-50 text-pink-700 border-pink-200' :
-                            place.priceLevel === 'VERY_EXPENSIVE' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                            (place.priceLevel === 'VERY_EXPENSIVE' || place.priceLevel === 'VERY_EXP') ? 'bg-purple-50 text-purple-700 border-purple-200' :
                             'bg-gray-50 text-gray-700 border-gray-200'
                           }`}>
                             {place.priceLevel === 'FREE' ? 'Miễn phí' :
-                             place.priceLevel === 'INEXPENSIVE' ? 'Giá rẻ' :
+                             (place.priceLevel === 'INEXPENSIVE' || place.priceLevel === 'CHEAP') ? 'Giá rẻ' :
                              place.priceLevel === 'MODERATE' ? 'Trung bình' :
                              place.priceLevel === 'EXPENSIVE' ? 'Cao cấp' :
-                             place.priceLevel === 'VERY_EXPENSIVE' ? 'Rất cao cấp' : 'Trung bình'}
+                             (place.priceLevel === 'VERY_EXPENSIVE' || place.priceLevel === 'VERY_EXP') ? 'Rất cao cấp' : 'Trung bình'}
                           </span>
                         </div>
                         <p className="text-gray-500 text-[10px] mt-1">
@@ -1450,10 +1465,10 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                           className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
                         >
                           <option value="FREE">Miễn phí</option>
-                          <option value="INEXPENSIVE">Giá rẻ</option>
+                          <option value="CHEAP">Giá rẻ</option>
                           <option value="MODERATE">Trung bình</option>
                           <option value="EXPENSIVE">Cao cấp</option>
-                          <option value="VERY_EXPENSIVE">Rất cao cấp</option>
+                          <option value="VERY_EXP">Rất cao cấp</option>
                         </select>
                       </div>
                       <div className="space-y-2">
@@ -1523,9 +1538,9 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
             {/* Tab 2: Reviews */}
             {modalType === 'edit' && activeTab === 'reviews' && (
               <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="space-y-4">
                   {/* Reviews List */}
-                  <div className="lg:col-span-2 space-y-4">
+                  <div className="space-y-4">
                     <h4 className="font-bold text-gray-900 text-base">Danh sách đánh giá</h4>
                     
                     {reviewsLoading ? (
@@ -1602,84 +1617,6 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                       </div>
                     )}
                   </div>
-
-                  {/* Add Review Form */}
-                  <form onSubmit={handleAddReview} className="p-4 bg-gray-50/50 rounded-xl border border-gray-200 space-y-4 h-fit">
-                    <h4 className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
-                      <Plus size={16} className="text-blue-600" />
-                      Thêm đánh giá mới
-                    </h4>
-
-                    <div className="space-y-3 text-xs">
-                      <div className="space-y-1">
-                        <label className="font-semibold text-gray-750">Tên người đánh giá *</label>
-                        <input
-                          type="text"
-                          required
-                          value={newReview.authorName}
-                          onChange={(e) => setNewReview({ ...newReview, authorName: e.target.value })}
-                          placeholder="VD: Nguyễn Văn A..."
-                          className="w-full text-xs text-gray-900 border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-blue-500"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="font-semibold text-gray-750">Điểm đánh giá (Stars)</label>
-                        <select
-                          value={newReview.rating}
-                          onChange={(e) => setNewReview({ ...newReview, rating: Number(e.target.value) })}
-                          className="w-full text-xs text-gray-900 border border-gray-300 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
-                        >
-                          <option value={5}>⭐⭐⭐⭐⭐ (5 điểm)</option>
-                          <option value={4}>⭐⭐⭐⭐ (4 điểm)</option>
-                          <option value={3}>⭐⭐⭐ (3 điểm)</option>
-                          <option value={2}>⭐⭐ (2 điểm)</option>
-                          <option value={1}>⭐ (1 điểm)</option>
-                        </select>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <label className="font-semibold text-gray-750">Ngày đánh giá</label>
-                          <input
-                            type="date"
-                            value={newReview.publishedDate}
-                            onChange={(e) => setNewReview({ ...newReview, publishedDate: e.target.value })}
-                            className="w-full text-xs text-gray-950 border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="font-semibold text-gray-750">Địa phương</label>
-                          <input
-                            type="text"
-                            value={newReview.authorLocation}
-                            onChange={(e) => setNewReview({ ...newReview, authorLocation: e.target.value })}
-                            placeholder="Cần Thơ, VN..."
-                            className="w-full text-xs text-gray-900 border border-gray-300 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="font-semibold text-gray-750">Nội dung đánh giá *</label>
-                        <textarea
-                          required
-                          value={newReview.comment}
-                          onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
-                          placeholder="Nhập nội dung nhận xét..."
-                          rows={4}
-                          className="w-full text-xs text-gray-900 border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-blue-500"
-                        />
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg text-xs transition-colors shadow-sm cursor-pointer"
-                    >
-                      Lưu đánh giá
-                    </button>
-                  </form>
                 </div>
               </div>
             )}

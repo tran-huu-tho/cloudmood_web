@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState, startTransition } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import {
   Cloud,
   Sun,
@@ -89,7 +88,6 @@ const POPULAR_CITIES = [
 ];
 
 export default function WeatherPage() {
-  const supabase = createClient();
   const [mounted, setMounted] = useState(false);
   const [monitoredList, setMonitoredList] = useState<WeatherCacheItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -132,16 +130,14 @@ export default function WeatherPage() {
   const fetchMonitoredCities = async () => {
     setLoadingList(true);
     try {
-      const { data, error } = await supabase
-        .from('WeatherCache')
-        .select('*');
-
-      if (error) throw error;
+      const res = await fetch('/api/admin/weather/cache');
+      if (!res.ok) throw new Error('Không thể tải danh sách thành phố đang giám sát.');
+      const data = await res.json();
 
       const savedOrder = localStorage.getItem('weather_monitored_order');
       if (savedOrder && data) {
         const orderArray = JSON.parse(savedOrder) as string[];
-        data.sort((a, b) => {
+        data.sort((a: any, b: any) => {
           const indexA = orderArray.indexOf(a.cityName);
           const indexB = orderArray.indexOf(b.cityName);
           if (indexA === -1 && indexB === -1) return a.cityName.localeCompare(b.cityName);
@@ -150,7 +146,7 @@ export default function WeatherPage() {
           return indexA - indexB;
         });
       } else if (data) {
-        data.sort((a, b) => a.cityName.localeCompare(b.cityName));
+        data.sort((a: any, b: any) => a.cityName.localeCompare(b.cityName));
       }
 
       setMonitoredList(data || []);
@@ -167,33 +163,7 @@ export default function WeatherPage() {
     fetchMonitoredCities();
   }, []);
 
-  // Save search result to DB via supabase client (since backend port 5432 might be blocked)
-  const saveToDb = async (weather: any) => {
-    try {
-      const dbData = {
-        cityName: weather.cityName,
-        latitude: weather.latitude,
-        longitude: weather.longitude,
-        temp: weather.temp,
-        humidity: weather.humidity,
-        windSpeed: weather.windSpeed,
-        condition: weather.condition,
-        description: weather.description,
-        icon: weather.icon,
-        rawResponse: {},
-        updatedAt: new Date().toISOString()
-      };
-      
-      const { error } = await supabase
-        .from('WeatherCache')
-        .upsert(dbData, { onConflict: 'cityName' });
-        
-      if (error) throw error;
-      fetchMonitoredCities();
-    } catch (err) {
-      console.error('Failed to save to Supabase from frontend:', err);
-    }
-  };
+
 
   // Search weather for a city (triggers backend fetch and caches the result)
   const handleSearch = async (city: string) => {
@@ -215,7 +185,7 @@ export default function WeatherPage() {
         showToast(`Tìm thấy nhiều địa điểm trùng khớp cho: ${city.trim()}`, 'success');
       } else {
         setSearchResult(data);
-        await saveToDb(data);
+        fetchMonitoredCities();
         showToast(`Tải thời tiết thành công cho: ${data.cityName}`, 'success');
       }
     } catch (err: any) {
@@ -241,7 +211,7 @@ export default function WeatherPage() {
       }
       const data = await res.json();
       setSearchResult(data);
-      await saveToDb(data);
+      fetchMonitoredCities();
       showToast(`Tải thời tiết thành công cho: ${data.cityName}`, 'success');
     } catch (err: any) {
       setSearchError(err.message || 'Đã xảy ra lỗi khi tải dữ liệu thời tiết.');
@@ -289,7 +259,6 @@ export default function WeatherPage() {
       if (!res.ok) throw new Error('Không thể làm mới dữ liệu.');
       
       const refreshedData = await res.json();
-      await saveToDb(refreshedData);
       
       // Update local state directly
       setMonitoredList(prev => 
@@ -316,12 +285,10 @@ export default function WeatherPage() {
       `Bạn có chắc chắn muốn ngừng giám sát thời tiết tại ${cityName}?`,
       async () => {
         try {
-          const { error } = await supabase
-            .from('WeatherCache')
-            .delete()
-            .eq('id', id);
-
-          if (error) throw error;
+          const res = await fetch(`/api/admin/weather/cache/${id}`, {
+            method: 'DELETE',
+          });
+          if (!res.ok) throw new Error('Lỗi khi ngừng giám sát.');
 
           setMonitoredList(prev => prev.filter(item => item.id !== id));
           
@@ -344,12 +311,10 @@ export default function WeatherPage() {
       async () => {
         setLoadingList(true);
         try {
-          const { error } = await supabase
-            .from('WeatherCache')
-            .delete()
-            .neq('id', -1);
-
-          if (error) throw error;
+          const res = await fetch('/api/admin/weather/cache', {
+            method: 'DELETE',
+          });
+          if (!res.ok) throw new Error('Lỗi khi xóa danh sách.');
 
           setMonitoredList([]);
           setSearchResult(null);
@@ -690,35 +655,6 @@ export default function WeatherPage() {
                     </div>
                   </div>
 
-                  {/* Real database places recommended */}
-                  {searchResult.suggestions.places && searchResult.suggestions.places.length > 0 && (
-                    <div className="space-y-3 pt-5 border-t border-slate-100">
-                      <h4 className="font-extrabold text-gray-800 flex items-center gap-2 text-sm uppercase tracking-wider">
-                        📍 Đề xuất địa điểm thực tế trong hệ thống
-                      </h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {searchResult.suggestions.places.map((place: any, index: number) => (
-                          <div 
-                            key={index} 
-                            className="bg-slate-50 border border-slate-200/80 p-4 rounded-2xl flex flex-col justify-between hover:border-indigo-400 hover:shadow-xs transition-all duration-200"
-                          >
-                            <div className="space-y-1.5">
-                              <div className="flex justify-between items-start gap-2.5">
-                                <span className="font-extrabold text-slate-800 text-sm line-clamp-1">{place.name}</span>
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-extrabold border border-indigo-100 shrink-0">
-                                  {place.category}
-                                </span>
-                              </div>
-                              <p className="text-xs text-slate-500 line-clamp-2">{place.address}</p>
-                            </div>
-                            <p className="text-xs text-indigo-900 bg-indigo-50/50 border border-indigo-100/30 p-2.5 rounded-xl mt-3 italic leading-relaxed font-semibold">
-                              "{place.reason}"
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

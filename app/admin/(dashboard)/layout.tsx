@@ -27,6 +27,25 @@ export default function DashboardLayout({
     };
   }, []);
 
+  // Global fetch interceptor to handle 401 Unauthorized errors and redirect to login
+  useEffect(() => {
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+      const response = await originalFetch(...args);
+      if (response.status === 401) {
+        // If the URL is already the login page or API auth login, do not redirect
+        const urlStr = typeof args[0] === 'string' ? args[0] : (args[0] as Request).url;
+        if (!urlStr.includes('/api/auth/login') && !urlStr.includes('/admin/login')) {
+          window.location.href = '/admin/login';
+        }
+      }
+      return response;
+    };
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, []);
+
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-slate-900 font-sans relative overflow-hidden">
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />

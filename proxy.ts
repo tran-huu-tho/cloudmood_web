@@ -1,14 +1,16 @@
-import { jwtVerify } from 'jose';
+import { decodeJwt } from 'jose';
 import { NextResponse, type NextRequest } from 'next/server';
-
-const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
 
 async function getSession(request: NextRequest) {
   const token = request.cookies.get('admin_session')?.value;
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, secret);
-    return payload;
+    const payload = decodeJwt(token);
+    // Check if token has expired
+    if (payload && payload.exp && payload.exp * 1000 > Date.now()) {
+      return payload;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -17,6 +19,7 @@ async function getSession(request: NextRequest) {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Let API requests pass through, the backend will validate the token
   if (pathname.startsWith('/api/')) return NextResponse.next();
 
   const session = await getSession(request);

@@ -1,13 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { Place, Itinerary, Category } from '@/lib/supabase/types';
 import { Users, MapPin, Map as MapIcon, MessageSquare, Loader2, Star, TrendingUp } from 'lucide-react';
 import { cleanAddress } from '@/lib/utils';
 
 export default function StatisticsPage() {
-  const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,25 +24,30 @@ export default function StatisticsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [usersCountRes, placesRes, itinerariesRes, reviewsCountRes, categoriesRes] = await Promise.all([
-        supabase.from('User').select('*', { count: 'exact', head: true }),
-        supabase.from('Place').select('*'),
-        supabase.from('Itinerary').select('*').order('id', { ascending: false }),
-        supabase.from('Review').select('*', { count: 'exact', head: true }),
-        supabase.from('Category').select('*'),
+      const [statsRes, placesRes, itinerariesRes, categoriesRes] = await Promise.all([
+        fetch('/api/admin/dashboard/stats').then(r => {
+          if (!r.ok) throw new Error('Không thể tải thống kê chung.');
+          return r.json();
+        }),
+        fetch('/api/admin/places?limit=10000').then(r => {
+          if (!r.ok) throw new Error('Không thể tải danh sách địa điểm.');
+          return r.json();
+        }),
+        fetch('/api/admin/itineraries?limit=10000').then(r => {
+          if (!r.ok) throw new Error('Không thể tải danh sách lịch trình.');
+          return r.json();
+        }),
+        fetch('/api/admin/categories').then(r => {
+          if (!r.ok) throw new Error('Không thể tải danh sách danh mục.');
+          return r.json();
+        }),
       ]);
 
-      if (usersCountRes.error) throw usersCountRes.error;
-      if (placesRes.error) throw placesRes.error;
-      if (itinerariesRes.error) throw itinerariesRes.error;
-      if (reviewsCountRes.error) throw reviewsCountRes.error;
-      if (categoriesRes.error) throw categoriesRes.error;
-
-      setTotalUsers(usersCountRes.count || 0);
-      setPlaces(placesRes.data || []);
-      setItineraries(itinerariesRes.data || []);
-      setTotalReviews(reviewsCountRes.count || 0);
-      setCategories(categoriesRes.data || []);
+      setTotalUsers(statsRes.stats?.userCount || 0);
+      setTotalReviews(statsRes.stats?.reviewCount || 0);
+      setPlaces(placesRes.places || []);
+      setItineraries(itinerariesRes || []);
+      setCategories(categoriesRes || []);
     } catch (err: any) {
       setError(err.message || 'Lỗi khi tải dữ liệu thống kê.');
     } finally {

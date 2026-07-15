@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import DashboardMap from '@/components/admin/DashboardMap';
 import { Users, MapPin, Map as MapIcon, MessageSquare, Star } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 
 
 
@@ -53,34 +52,20 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const supabase = createClient();
-        const [reviewsRes, usersRes, placesRes, itinerariesCountRes, reviewsCountRes] = await Promise.all([
-          supabase.from('Review').select('*').order('id', { ascending: false }).limit(3),
-          supabase.from('User').select('id, fullName, email, avatar'),
-          supabase.from('Place').select('id, name'),
-          supabase.from('Itinerary').select('*', { count: 'exact', head: true }),
-          supabase.from('Review').select('*', { count: 'exact', head: true }),
-        ]);
-
-        if (usersRes.data) {
-          setUsers(usersRes.data);
-          setUserCount(usersRes.data.length);
-        }
-        if (placesRes.data) {
-          setPlaces(placesRes.data);
-          setPlaceCount(placesRes.data.length);
-        }
-        if (reviewsRes.data) {
-          setReviews(reviewsRes.data);
-        }
-        if (itinerariesCountRes.count !== null) {
-          setItineraryCount(itinerariesCountRes.count);
-        }
-        if (reviewsCountRes.count !== null) {
-          setReviewCount(reviewsCountRes.count);
+        const res = await fetch('/api/admin/dashboard/stats');
+        if (!res.ok) throw new Error('Không thể tải dữ liệu thống kê.');
+        
+        const data = await res.json();
+        
+        setReviews(data.recentReviews || []);
+        if (data.stats) {
+          setUserCount(data.stats.userCount);
+          setPlaceCount(data.stats.placeCount);
+          setItineraryCount(data.stats.itineraryCount);
+          setReviewCount(data.stats.reviewCount);
         }
       } catch (err) {
-        console.error('Error fetching dashboard reviews:', err);
+        console.error('Error fetching dashboard statistics:', err);
       } finally {
         setLoading(false);
       }
@@ -104,15 +89,11 @@ export default function AdminDashboard() {
   };
 
   // Determine which reviews to display
-  const displayReviews = reviews.length > 0 ? reviews.map(r => {
-    const user = users.find(u => u.id === r.userId);
-    const place = places.find(p => p.id === r.placeId);
-    return {
-      ...r,
-      user: user || { fullName: 'Ẩn danh', avatar: null, email: '' },
-      place: place || { name: 'Địa điểm không rõ' }
-    };
-  }) : mockReviews;
+  const displayReviews = reviews.length > 0 ? reviews.map(r => ({
+    ...r,
+    user: r.user || { fullName: 'Ẩn danh', avatar: null, email: '' },
+    place: r.place || { name: 'Địa điểm không rõ' }
+  })) : mockReviews;
 
   const stats = [
     { 

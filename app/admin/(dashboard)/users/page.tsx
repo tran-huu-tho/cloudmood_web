@@ -1,13 +1,10 @@
 "use client";
 
 import React, { useEffect, useState, startTransition } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { UserRow } from '@/lib/supabase/types';
 import { Search, X, Loader2, Shield, Eye, EyeOff, Lock, Unlock, Calendar, Mail, Check, Plus, User } from 'lucide-react';
-import bcrypt from 'bcryptjs';
 
 export default function UsersPage() {
-  const supabase = createClient();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -73,13 +70,10 @@ export default function UsersPage() {
     setLoading(true);
     setError(null);
     try {
-      const { data, error } = await supabase
-        .from('User')
-        .select('*')
-        .order('id', { ascending: true });
-
-      if (error) throw error;
-      setUsers(data || []);
+      const res = await fetch('/api/admin/users?limit=10000');
+      if (!res.ok) throw new Error('Không thể tải danh sách người dùng.');
+      const data = await res.json();
+      setUsers(data.users || []);
     } catch (err: any) {
       setError(err.message || 'Lỗi khi tải danh sách người dùng.');
     } finally {
@@ -91,16 +85,17 @@ export default function UsersPage() {
   const handleToggleLock = async (user: UserRow) => {
     const newBlockedState = !user.isBlocked;
     try {
-      const { error } = await supabase
-        .from('User')
-        .update({ isBlocked: newBlockedState } as any)
-        .eq('id', user.id);
+      const res = await fetch(`/api/admin/users/${user.id}/block`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isBlocked: newBlockedState }),
+      });
 
-      if (error) {
-        if (error.message.includes('column') && error.message.includes('isBlocked')) {
-          throw new Error('Cột isBlocked chưa được cấu hình trên Supabase. Vui lòng nhấp vào nút "+" ở bảng User trên Supabase Dashboard và thêm cột "isBlocked" (kiểu bool, mặc định false).');
-        }
-        throw error;
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Lỗi khi thay đổi trạng thái khóa.');
       }
 
       setUsers(users.map((u) => (u.id === user.id ? { ...u, isBlocked: newBlockedState } : u)));
@@ -130,43 +125,27 @@ export default function UsersPage() {
     setModalLoading(true);
     setModalError(null);
     try {
-      // Check if email already exists
-      const { data: existing, error: checkError } = await supabase
-        .from('User')
-        .select('id')
-        .eq('email', newUser.email.trim().toLowerCase())
-        .maybeSingle();
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fullName: newUser.fullName.trim(),
+          email: newUser.email.trim().toLowerCase(),
+          password: newUser.password.trim(),
+          role: newUser.role,
+        }),
+      });
 
-      if (checkError) throw checkError;
-      if (existing) {
-        throw new Error('Email này đã được sử dụng bởi tài khoản khác.');
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Lỗi khi lưu thông tin người dùng.');
       }
 
-      // Hash password using bcryptjs
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(newUser.password.trim(), salt);
-
-      const payload = {
-        fullName: newUser.fullName.trim(),
-        email: newUser.email.trim().toLowerCase(),
-        password: hashedPassword,
-        avatar: '/default-avatar.jpg',
-        createdAt: new Date().toISOString(),
-        role: newUser.role,
-      };
-
-      const { data, error } = await supabase
-        .from('User')
-        .insert([payload])
-        .select();
-
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        setUsers(prev => [data[0], ...prev]);
-        showToast('Thêm tài khoản người dùng thành công!', 'success');
-        setIsCreateModalOpen(false);
-      }
+      setUsers(prev => [data, ...prev]);
+      showToast('Thêm tài khoản người dùng thành công!', 'success');
+      setIsCreateModalOpen(false);
     } catch (err: any) {
       setModalError(err.message || 'Lỗi khi lưu thông tin người dùng.');
     } finally {

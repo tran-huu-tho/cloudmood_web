@@ -7,7 +7,6 @@ import {
   Wallet, Map as MapIcon, Check, Calendar, Shield,
   Eye, EyeOff
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 
 export default function ProfilePage() {
   const [adminUser, setAdminUser] = useState<any>(null);
@@ -114,13 +113,16 @@ export default function ProfilePage() {
     setUploadingAvatar(true);
     try {
       const base64String = await compressImage(file);
-      const supabase = createClient();
-      const { error } = await supabase
-        .from('User')
-        .update({ avatar: base64String })
-        .eq('id', adminUser.id);
-
-      if (error) throw error;
+      const res = await fetch('/api/auth/update-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: adminUser.fullName,
+          avatarUrl: base64String
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Lỗi khi cập nhật ảnh đại diện.');
 
       setAdminUser((prev: any) => prev ? { ...prev, avatar: base64String } : null);
       window.dispatchEvent(new Event('profile-updated'));

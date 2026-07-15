@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { SignJWT } from 'jose';
 
-const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
 const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:3000';
 
 export async function POST(req: Request) {
@@ -32,23 +30,15 @@ export async function POST(req: Request) {
 
     const { user, token: backendToken } = backendData;
 
-    if (!user.role) {
-      return NextResponse.json({ error: 'Tài khoản không có quyền truy cập.' }, { status: 403 });
+    // Ensure the user has admin role (role: true)
+    if (user.role !== true) {
+      return NextResponse.json({ error: 'Tài khoản không có quyền truy cập quản trị.' }, { status: 403 });
     }
 
-    const token = await new SignJWT({
-      sub: String(user.id),
-      email: user.email,
-      fullName: user.fullName,
-      backendToken: backendToken,
-    })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuedAt()
-      .setExpirationTime('7d')
-      .sign(secret);
-
     const response = NextResponse.json({ success: true });
-    response.cookies.set('admin_session', token, {
+    
+    // Save the backend's JWT token directly into the cookie
+    response.cookies.set('admin_session', backendToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

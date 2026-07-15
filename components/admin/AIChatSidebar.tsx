@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect, useTransition } from 'react';
 import { MessageSquare, X, Send, Loader2, Star, Trash2, CheckCircle2, AlertCircle, BarChart3, MapPin, Globe, Phone, ArrowUp } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 import { getCategoryIcon } from '@/app/admin/(dashboard)/categories/page';
 
 interface AIChatSidebarProps {
@@ -29,7 +28,6 @@ export default function AIChatSidebar({ isOpen, onClose }: AIChatSidebarProps) {
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isPending, startTransition] = useTransition();
-  const supabase = createClient();
 
   useEffect(() => {
     if (isOpen) {

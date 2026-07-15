@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState, startTransition } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { Category } from '@/lib/supabase/types';
 import { 
   Plus, Edit2, Trash2, Search, X, Loader2, Check,
@@ -47,7 +46,6 @@ const getCategoryBadgeStyle = (categoryId: number) => {
 };
 
 export default function CategoriesPage() {
-  const supabase = createClient();
   const [categories, setCategories] = useState<Category[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -95,12 +93,9 @@ export default function CategoriesPage() {
     setLoading(true);
     setError(null);
     try {
-      const { data, error } = await supabase
-        .from('Category')
-        .select('*')
-        .order('id', { ascending: true });
-
-      if (error) throw error;
+      const res = await fetch('/api/admin/categories');
+      if (!res.ok) throw new Error('Không thể tải danh sách danh mục.');
+      const data = await res.json();
       setCategories(data || []);
     } catch (err: any) {
       setError(err.message || 'Lỗi khi tải danh sách danh mục.');
@@ -134,37 +129,31 @@ export default function CategoriesPage() {
     setModalError(null);
     try {
       if (modalType === 'create') {
-        const { data, error } = await supabase
-          .from('Category')
-          .insert([{ 
+        const res = await fetch('/api/admin/categories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
             name: currentCategory.name.trim(),
             iconCode: currentCategory.iconCode || null
-          }])
-          .select();
-
-        if (error) throw error;
-        if (data && data.length > 0) {
-          setCategories([...categories, data[0]]);
-          showToast('Thêm danh mục thành công!', 'success');
-        }
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Có lỗi xảy ra khi lưu.');
+        setCategories([...categories, data]);
+        showToast('Thêm danh mục thành công!', 'success');
       } else {
-        const { data, error } = await supabase
-          .from('Category')
-          .update({ 
+        const res = await fetch(`/api/admin/categories/${currentCategory.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
             name: currentCategory.name.trim(),
             iconCode: currentCategory.iconCode || null
-          })
-          .eq('id', currentCategory.id!)
-          .select();
-
-        if (error) throw error;
-        const updatedRow = (data && data.length > 0) ? data[0] : { 
-          id: currentCategory.id!, 
-          name: currentCategory.name.trim(),
-          iconCode: currentCategory.iconCode || null
-        } as Category;
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Có lỗi xảy ra khi lưu.');
         setCategories(
-          categories.map((c) => (c && c.id === currentCategory.id ? updatedRow : c))
+          categories.map((c) => (c && c.id === currentCategory.id ? data : c))
         );
         showToast('Cập nhật danh mục thành công!', 'success');
       }
@@ -185,32 +174,19 @@ export default function CategoriesPage() {
     if (deletingId === null) return;
     setDeleteLoading(true);
     try {
-      // Safety check: count linked places in database
-      const { count, error: countError } = await supabase
-        .from('Place')
-        .select('*', { count: 'exact', head: true })
-        .eq('categoryId', deletingId);
-
-      if (countError) throw countError;
-
-      if (count && count > 0) {
-        showToast(`Không thể xóa! Danh mục này đang được liên kết bởi ${count} địa điểm.`, 'error');
-        setIsDeleteOpen(false);
-        return;
+      const res = await fetch(`/api/admin/categories/${deletingId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Lỗi khi xóa danh mục.');
       }
-
-      // Safe to delete
-      const { error } = await supabase
-        .from('Category')
-        .delete()
-        .eq('id', deletingId);
-
-      if (error) throw error;
       setCategories(categories.filter((c) => c.id !== deletingId));
       setIsDeleteOpen(false);
       showToast('Xóa danh mục thành công!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Lỗi khi xóa danh mục.', 'error');
+      setIsDeleteOpen(false);
     } finally {
       setDeleteLoading(false);
       setDeletingId(null);

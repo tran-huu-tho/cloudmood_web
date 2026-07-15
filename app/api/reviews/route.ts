@@ -1,7 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { jwtVerify } from 'jose';
 
-const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
 const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:3000';
 
 export async function DELETE(req: NextRequest) {
@@ -9,13 +7,6 @@ export async function DELETE(req: NextRequest) {
     const token = req.cookies.get('admin_session')?.value;
     if (!token) {
       return NextResponse.json({ error: 'Phiên đăng nhập đã hết hạn.' }, { status: 401 });
-    }
-
-    const { payload } = await jwtVerify(token, secret);
-    const backendToken = payload.backendToken as string;
-
-    if (!backendToken) {
-      return NextResponse.json({ error: 'Không tìm thấy thông tin xác thực backend.' }, { status: 401 });
     }
 
     const { searchParams } = new URL(req.url);
@@ -29,7 +20,7 @@ export async function DELETE(req: NextRequest) {
     const backendRes = await fetch(`${backendUrl}/reviews/${id}`, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Bearer ${backendToken}`,
+        'Authorization': `Bearer ${token}`,
       },
     });
 
