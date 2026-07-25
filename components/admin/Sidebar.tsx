@@ -12,7 +12,8 @@ import {
   BarChart3,
   MessageSquare,
   Cloud,
-  X
+  X,
+  Compass
 } from 'lucide-react';
 
 const navItems = [
@@ -20,6 +21,7 @@ const navItems = [
   { name: 'Quản lý người dùng', path: '/admin/users', icon: Users },
   { name: 'Quản lý địa điểm', path: '/admin/locations', icon: MapPin },
   { name: 'Quản lý danh mục', path: '/admin/categories', icon: FolderTree },
+  { name: 'Quản lý hành trình', path: '/admin/itineraries', icon: Compass },
   { name: 'Quản lý thời tiết', path: '/admin/weather', icon: Cloud },
   { name: 'Thống kê', path: '/admin/statistics', icon: BarChart3 },
 ];

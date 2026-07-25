@@ -96,6 +96,7 @@ export default function LocationsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
   const [selectedSubCategoryFilter, setSelectedSubCategoryFilter] = useState<string>('all');
+  const [approvalFilter, setApprovalFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startFilterTransition] = useTransition();
@@ -120,7 +121,7 @@ export default function LocationsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedCategoryFilter, selectedSubCategoryFilter]);
+  }, [searchQuery, selectedCategoryFilter, selectedSubCategoryFilter, approvalFilter]);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -241,6 +242,7 @@ export default function LocationsPage() {
       priceLevel: 'MODERATE',
       subCategories: [],
       subCategoriesInput: '',
+      isApproved: true,
       openingHours: {
         monday: ['08:00', '21:00'],
         tuesday: ['08:00', '21:00'],
@@ -291,6 +293,7 @@ export default function LocationsPage() {
       subCategories: place.subCategories || [],
       subCategoriesInput: place.subCategories ? (place.subCategories as string[]).join(', ') : '',
       openingHours: parsedOpeningHours,
+      isApproved: place.isApproved === true || place.isApproved == null,
     });
     setModalType('edit');
     setActiveTab('general');
@@ -410,6 +413,7 @@ export default function LocationsPage() {
         openingHours: currentPlace.openingHours || null,
         subCategories: currentPlace.subCategories || [],
         price: "",
+        isApproved: currentPlace.isApproved === true || currentPlace.isApproved == null,
       };
 
       if (modalType === 'create') {
@@ -438,6 +442,22 @@ export default function LocationsPage() {
       setModalError(err.message || 'Lỗi khi lưu thông tin địa điểm.');
     } finally {
       setModalLoading(false);
+    }
+  };
+
+  const handleApprovePlace = async (id: number) => {
+    try {
+      const res = await fetch(`/api/admin/places/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isApproved: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Lỗi khi duyệt địa điểm.');
+      setPlaces(prev => prev.map(p => p.id === id ? { ...p, isApproved: true } : p));
+      showToast('Duyệt địa điểm thành công!', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi khi duyệt địa điểm.', 'error');
     }
   };
 
@@ -734,7 +754,13 @@ export default function LocationsPage() {
       selectedSubCategoryFilter === 'all' || 
       (Array.isArray(subCats) && subCats.includes(selectedSubCategoryFilter));
 
-    return matchesSearch && matchesCategory && matchesSubCategory;
+    const isApprovedVal = p.isApproved === true || p.isApproved == null;
+    const matchesApproval =
+      approvalFilter === 'all' ||
+      (approvalFilter === 'approved' && isApprovedVal) ||
+      (approvalFilter === 'pending' && !isApprovedVal);
+
+    return matchesSearch && matchesCategory && matchesSubCategory && matchesApproval;
   });
 
   const totalPages = Math.ceil(filteredPlaces.length / itemsPerPage);
@@ -853,6 +879,19 @@ export default function LocationsPage() {
                 </option>
               ))}
             </select>
+            {/* Approval Filter */}
+            <select
+              value={approvalFilter}
+              onChange={(e) => {
+                const val = e.target.value;
+                startFilterTransition(() => setApprovalFilter(val));
+              }}
+              className="bg-white text-gray-700 text-sm rounded-lg px-3 py-2 border border-gray-200 focus:outline-none focus:border-blue-500 w-full sm:w-48 cursor-pointer font-medium"
+            >
+              <option value="all">Tất cả trạng thái</option>
+              <option value="approved">Đã duyệt</option>
+              <option value="pending">Chờ duyệt</option>
+            </select>
           </div>
           <div className="text-sm text-gray-500 font-medium">
             {isPending ? 'Đang lọc...' : `Hiển thị: ${filteredPlaces.length} địa điểm`}
@@ -883,6 +922,7 @@ export default function LocationsPage() {
                   <th className="px-6 py-4">Danh mục</th>
                   <th className="px-6 py-4">Địa chỉ & Tọa độ</th>
                   <th className="px-6 py-4">Mức giá & Giờ mở</th>
+                  <th className="px-6 py-4">Trạng thái</th>
                   <th className="px-6 py-4 text-right">Thao tác</th>
                 </tr>
               </thead>
@@ -945,8 +985,28 @@ export default function LocationsPage() {
                           ⏱️ {displayOpeningHours(place)}
                         </p>
                       </td>
+                      <td className="px-6 py-4">
+                        {place.isApproved === false ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                            Chờ duyệt
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Đã duyệt
+                          </span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-right space-x-1 shrink-0">
-                        {place.latitude && place.longitude && (
+                        {place.isApproved === false && (
+                          <button
+                            onClick={() => handleApprovePlace(Number(place.id))}
+                            className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
+                            title="Duyệt địa điểm"
+                          >
+                            <Check size={16} />
+                          </button>
+                        )}
+                        {!!(place.latitude && place.longitude) && (
                           <a
                             href={`https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}`}
                             target="_blank"
@@ -1215,6 +1275,20 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                           </option>
                         ))}
                       </select>
+                    </div>
+
+                    <div className="flex items-center gap-2 py-1">
+                      <input
+                        type="checkbox"
+                        id="isApprovedCheckbox"
+                        checked={currentPlace.isApproved === true || currentPlace.isApproved == null}
+                        onChange={(e) => setCurrentPlace({ ...currentPlace, isApproved: e.target.checked })}
+                        disabled={modalLoading}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                      />
+                      <label htmlFor="isApprovedCheckbox" className="text-sm font-semibold text-gray-700 cursor-pointer select-none">
+                        Đã phê duyệt (Hiển thị cho người dùng)
+                      </label>
                     </div>
 
                     <div className="space-y-2">
