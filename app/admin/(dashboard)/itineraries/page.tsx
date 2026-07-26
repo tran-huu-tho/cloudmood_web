@@ -32,9 +32,21 @@ import {
   Circle,
   ExternalLink,
   ShieldCheck,
-  Mail,
-  Send,
-  AlertCircle
+  AlertCircle,
+  Phone,
+  Globe,
+  Lock,
+  Paperclip,
+  Smile,
+  Utensils,
+  Hotel,
+  Camera,
+  Coffee,
+  ShoppingBag,
+  Ship,
+  Plane,
+  Landmark,
+  Receipt
 } from 'lucide-react';
 
 interface CreatorUser {
@@ -59,6 +71,8 @@ interface Itinerary {
   isGuide: boolean | null;
   isAi: boolean | null;
   coverImage: string | null;
+  currencySymbol?: string | null;
+  currencyCode?: string | null;
   user?: CreatorUser;
   _count?: {
     savedPlaces: number;
@@ -67,6 +81,7 @@ interface Itinerary {
     members: number;
   };
   expenses?: { amount: number; category?: string }[];
+  settlements?: any[];
 }
 
 interface ExplorePost {
@@ -104,11 +119,508 @@ interface ChecklistCategory {
   items: ChecklistItem[];
 }
 
+const CURRENCY_RATES: Record<string, number> = {
+  VND: 1.0,
+  USD: 26320.01,
+  EUR: 28500.0,
+  JPY: 165.0,
+  KRW: 19.5,
+  THB: 720.0,
+  CNY: 3620.0,
+  GBP: 33500.0,
+  SGD: 19400.0,
+};
+
+function convertExpenseToItineraryCurrency(exp: any, itinerary: any): number {
+  if (!exp) return 0;
+  const amt = Number(exp.amount) || 0;
+  if (amt <= 0) return 0;
+
+  let targetCode = (itinerary?.currencyCode || '').toString().trim().toUpperCase();
+  const targetSymbol = (itinerary?.currencySymbol || '').toString().trim();
+
+  if (!targetCode || targetCode === 'VND') {
+    if (targetSymbol.includes('$') || targetSymbol.toUpperCase().includes('USD')) targetCode = 'USD';
+    else if (targetSymbol.includes('€') || targetSymbol.toUpperCase().includes('EUR')) targetCode = 'EUR';
+    else if (targetSymbol.includes('¥') || targetSymbol.toUpperCase().includes('JPY') || targetSymbol.toUpperCase().includes('CNY')) targetCode = 'JPY';
+    else if (targetSymbol.includes('₩') || targetSymbol.toUpperCase().includes('KRW')) targetCode = 'KRW';
+    else if (targetSymbol.includes('£') || targetSymbol.toUpperCase().includes('GBP')) targetCode = 'GBP';
+    else if (targetSymbol.includes('฿') || targetSymbol.toUpperCase().includes('THB')) targetCode = 'THB';
+    else targetCode = 'VND';
+  }
+
+  let expCode = (exp.currencyCode || exp.currency || '').toString().trim().toUpperCase();
+  const expSymbol = (exp.currencySymbol || '').toString().trim();
+
+  if (!expCode || expCode === 'VND') {
+    if (expSymbol.includes('$') || expSymbol.toUpperCase().includes('USD')) expCode = 'USD';
+    else if (expSymbol.includes('€') || expSymbol.toUpperCase().includes('EUR')) expCode = 'EUR';
+    else if (expSymbol.includes('¥') || expSymbol.toUpperCase().includes('JPY') || expSymbol.toUpperCase().includes('CNY')) expCode = 'JPY';
+    else if (expSymbol.includes('₩') || expSymbol.toUpperCase().includes('KRW')) expCode = 'KRW';
+    else if (expSymbol.includes('£') || expSymbol.toUpperCase().includes('GBP')) expCode = 'GBP';
+    else if (expSymbol.includes('฿') || expSymbol.toUpperCase().includes('THB')) expCode = 'THB';
+    else if (expSymbol.includes('đ') || expSymbol.includes('₫') || expSymbol.toUpperCase().includes('VND')) expCode = 'VND';
+    else if (amt < 1000 && targetCode === 'VND') {
+      // Smart fallback: amounts < 1000 in a VND itinerary are USD expenses
+      expCode = 'USD';
+    }
+  }
+
+  if (expCode === targetCode) return amt;
+
+  const expRate = CURRENCY_RATES[expCode] || 1.0;
+  const targetRate = CURRENCY_RATES[targetCode] || 1.0;
+
+  return (amt * expRate) / targetRate;
+}
+
 export default function ItinerariesPage() {
   // Helper to remove zip/postal codes (e.g. 94100, 65000, 900000) from address strings
   const formatAddress = (text?: string | null) => {
     if (!text) return '';
     return text.replace(/\s*\b\d{4,6}\b/g, '').trim();
+  };
+
+  // Helper to group saved places by section (ItinerarySection)
+  const groupSavedPlacesBySection = (sections: any[] = [], savedPlaces: any[] = []) => {
+    const sectionMap = new Map<string, { section: any; items: any[] }>();
+
+    // 1. Add explicitly defined sections from ItinerarySection
+    if (sections && Array.isArray(sections) && sections.length > 0) {
+      sections.forEach((sec: any) => {
+        const secName = sec.name && sec.name.trim() !== '' ? sec.name : 'Tổng quan';
+        if (!sectionMap.has(secName)) {
+          sectionMap.set(secName, {
+            section: sec,
+            items: [],
+          });
+        }
+      });
+    }
+
+    // 2. Distribute savedPlaces into sectionMap
+    if (savedPlaces && Array.isArray(savedPlaces) && savedPlaces.length > 0) {
+      savedPlaces.forEach((sp: any) => {
+        const secName = sp.section && sp.section.trim() !== '' ? sp.section : 'Tổng quan';
+        if (!sectionMap.has(secName)) {
+          sectionMap.set(secName, {
+            section: { name: secName, subTitle: null, sectionType: 'LIST' },
+            items: [],
+          });
+        }
+        sectionMap.get(secName)!.items.push(sp);
+      });
+    }
+
+    // Sort items inside each section by sortOrder ascending
+    sectionMap.forEach((entry) => {
+      entry.items.sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0));
+    });
+
+    return Array.from(sectionMap.values());
+  };
+
+  // Helper to parse todo/checklist items from JSON column (todoItems)
+  const parseTodoItems = (rawTodo: any): Array<{ text: string; done: boolean }> => {
+    if (!rawTodo) return [];
+    let list: any[] = [];
+    if (Array.isArray(rawTodo)) {
+      list = rawTodo;
+    } else if (typeof rawTodo === 'string') {
+      try {
+        const parsed = JSON.parse(rawTodo);
+        if (Array.isArray(parsed)) list = parsed;
+      } catch (_) {}
+    }
+    return list
+      .map((item: any) => ({
+        text: typeof item === 'string' ? item : item.text || item.title || item.name || '',
+        done: !!item.done,
+      }))
+      .filter((t) => t.text.trim() !== '');
+  };
+
+  // Helper to parse ARGB decimal int or hex color string into a valid CSS color
+  const parseSectionColor = (colorCode?: string | null) => {
+    if (!colorCode) return null;
+    const str = colorCode.toString().trim();
+    if (/^\d+$/.test(str)) {
+      const num = Number(str);
+      const hex = num.toString(16).padStart(8, '0');
+      return `#${hex.slice(2)}`;
+    }
+    if (str.startsWith('0x') || str.startsWith('0X')) {
+      const hex = str.slice(2).padStart(8, '0');
+      return `#${hex.slice(2)}`;
+    }
+    if (str.startsWith('#')) return str;
+    return str;
+  };
+
+  // Helper to format opening hours
+  const displayOpeningHours = (place: any) => {
+    if (!place) return null;
+    const rawHours = place.openingHours || place.opening_hours;
+    if (typeof rawHours === 'string') return rawHours;
+    if (rawHours && typeof rawHours === 'object') {
+      if (rawHours.weekday_text && Array.isArray(rawHours.weekday_text)) {
+        return rawHours.weekday_text[0];
+      }
+    }
+    return null;
+  };
+
+  // Helper to parse JSON array columns
+  const parseJsonArray = (data: any): any[] => {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (typeof data === 'string') {
+      try {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (_) {}
+    }
+    return [];
+  };
+
+  // Helper to get privacy status badge info (Công khai, Bạn bè, Riêng tư)
+  const getPrivacyBadgeInfo = (item?: any, trip?: any) => {
+    const raw = (
+      item?.privacy ||
+      item?.privacyLevel ||
+      item?.visibility ||
+      trip?.companion ||
+      trip?.privacy ||
+      trip?.privacyLevel ||
+      ''
+    ).toString().toLowerCase().trim();
+
+    if (raw.includes('công khai') || raw.includes('public')) {
+      return {
+        key: 'public',
+        label: 'Công khai',
+        icon: <Globe size={13} className="text-sky-600 dark:text-sky-400 shrink-0" />,
+        badgeClass: 'bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 border-sky-200 dark:border-sky-900/60',
+        bannerBadgeClass: 'bg-sky-600/90 text-white border-sky-400/30'
+      };
+    } else if (raw.includes('riêng tư') || raw.includes('private') || raw.includes('lock')) {
+      return {
+        key: 'private',
+        label: 'Riêng tư',
+        icon: <Lock size={13} className="text-rose-600 dark:text-rose-400 shrink-0" />,
+        badgeClass: 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-900/60',
+        bannerBadgeClass: 'bg-rose-600/90 text-white border-rose-400/30'
+      };
+    }
+    // Default to 'Bạn bè' (Friends)
+    return {
+      key: 'friends',
+      label: 'Bạn bè',
+      icon: <Users size={13} className="text-amber-600 dark:text-amber-400 shrink-0" />,
+      badgeClass: 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-900/60',
+      bannerBadgeClass: 'bg-amber-600/90 text-white border-amber-400/30'
+    };
+  };
+
+  // Helper to render icon component based on iconCode string or category name
+  const renderIconFromCode = (iconCode?: string | number | null, fallback?: any) => {
+    if (!iconCode) return fallback || <MapPin size={18} />;
+    const str = iconCode.toString().toLowerCase().trim();
+
+    if (
+      str.includes('boat') ||
+      str.includes('ship') ||
+      str.includes('river') ||
+      str.includes('tour') ||
+      str.includes('bến') ||
+      str.includes('thuyền') ||
+      str.includes('sông') ||
+      str === '58696' ||
+      str === '0xe548' ||
+      str === '58695'
+    ) {
+      return <Ship size={18} />;
+    }
+    if (
+      str.includes('restaurant') ||
+      str.includes('food') ||
+      str.includes('eat') ||
+      str.includes('utensil') ||
+      str.includes('quán ăn') ||
+      str.includes('nhà hàng') ||
+      str.includes('ẩm thực') ||
+      str === '58751' ||
+      str.includes('0xe57f')
+    ) {
+      return <Utensils size={18} />;
+    }
+    if (
+      str.includes('hotel') ||
+      str.includes('bed') ||
+      str.includes('stay') ||
+      str.includes('khách sạn') ||
+      str.includes('lưu trú') ||
+      str === '58136' ||
+      str.includes('0xe318')
+    ) {
+      return <Hotel size={18} />;
+    }
+    if (
+      str.includes('flight') ||
+      str.includes('plane') ||
+      str.includes('chuyến bay') ||
+      str === '58356'
+    ) {
+      return <Plane size={18} />;
+    }
+    if (
+      str.includes('camera') ||
+      str.includes('photo') ||
+      str.includes('see') ||
+      str.includes('tham quan') ||
+      str.includes('điểm đến') ||
+      str.includes('0xe412')
+    ) {
+      return <Camera size={18} />;
+    }
+    if (str.includes('coffee') || str.includes('cafe') || str.includes('cà phê') || str.includes('đồ uống')) {
+      return <Coffee size={18} />;
+    }
+    if (str.includes('shopping') || str.includes('bag') || str.includes('store') || str.includes('mua sắm')) {
+      return <ShoppingBag size={18} />;
+    }
+    if (str.includes('check') || str.includes('task') || str.includes('todo') || str.includes('checklist')) {
+      return <CheckSquare size={18} />;
+    }
+    if (str.includes('compass') || str.includes('guide') || str.includes('hướng dẫn')) {
+      return <Compass size={18} />;
+    }
+    if (str.includes('file') || str.includes('note') || str.includes('ghi chú')) {
+      return <FileText size={18} />;
+    }
+
+    return fallback || <MapPin size={18} />;
+  };
+
+  // Unified renderer for Itinerary Item Cards (both in Days tab and Overview tab)
+  const renderItineraryItemCard = (item: any, cardIdx: number, sectionColor?: string | null) => {
+    const isPlace = !!item.place;
+    const isPlaceholderNote = !item.noteText || item.noteText === 'Thêm ghi chú tại đây';
+
+    // Lookup section color and iconCode if not directly passed
+    const itemSection = item.section && selectedTripDetail?.sections
+      ? selectedTripDetail.sections.find((s: any) => s.name === item.section)
+      : null;
+
+    const dayNum = Number(item.day);
+    const dayConfig = dayNum > 0 && selectedTripDetail?.dayConfigs ? (() => {
+      let configs = selectedTripDetail.dayConfigs;
+      if (typeof configs === 'string') {
+        try { configs = JSON.parse(configs); } catch (_) {}
+      }
+      return configs && typeof configs === 'object' ? (configs[dayNum.toString()] || configs[dayNum] || null) : null;
+    })() : null;
+
+    const itemSectionColor =
+      sectionColor ||
+      (itemSection ? parseSectionColor(itemSection.colorCode) : null) ||
+      (dayConfig?.color ? parseSectionColor(dayConfig.color) : null);
+
+    const itemIconCode =
+      itemSection?.iconCode ||
+      dayConfig?.iconCode ||
+      dayConfig?.icon ||
+      item.place?.category?.iconCode ||
+      item.place?.category?.name;
+
+    const rawTitle = isPlace
+      ? item.place.name
+      : !isPlaceholderNote
+      ? item.noteText
+      : 'Ghi chú / Hoạt động cá nhân';
+
+    const todos = parseTodoItems(item.todoItems);
+    const attachments = parseJsonArray(item.attachments);
+    const reactions = parseJsonArray(item.reactions);
+    const isTodoItem = todos.length > 0 || (rawTitle && rawTitle.startsWith('[TODO]'));
+    const title = rawTitle ? rawTitle.replace(/^\[TODO\]\s*/i, '') : rawTitle;
+
+    const customNote = isPlace && !isPlaceholderNote ? item.noteText : null;
+    const openingHoursStr = isPlace ? displayOpeningHours(item.place) : null;
+    const placePhoto = isPlace ? (item.place.image || item.place.photos?.[0]?.urlThumbnail || item.place.photos?.[0]?.urlOriginal) : null;
+    const expenseAmount = item.expense ? `${item.expense.amount.toLocaleString('vi-VN')} ${item.expense.currencySymbol || 'đ'}` : null;
+
+    // Render Note / Todo item (!isPlace) -> icon + title + todo items
+    if (!isPlace) {
+      return (
+        <div
+          key={item.id || cardIdx}
+          onClick={() => handleOpenPlaceDetail(item)}
+          className="p-3.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-start gap-3 shadow-xs cursor-pointer hover:border-blue-400 hover:shadow-sm transition-all"
+        >
+          {isTodoItem ? (
+            <CheckSquare size={18} className="text-amber-500 shrink-0 mt-0.5" />
+          ) : (
+            <FileText size={18} className="text-amber-500 shrink-0 mt-0.5" />
+          )}
+          <div className="flex-1 space-y-1">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-sm text-gray-900 dark:text-slate-100">
+                {title}
+              </h4>
+              {item.isVisited && (
+                <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md flex items-center gap-1">
+                  <CheckCircle2 size={12} /> Đã ghé
+                </span>
+              )}
+            </div>
+
+            {/* Todo Checklist items list */}
+            {todos.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-gray-100 dark:border-slate-800 space-y-1 pl-1">
+                {todos.map((todo, tIdx) => (
+                  <div key={tIdx} className="flex items-center gap-2 text-xs">
+                    {todo.done ? (
+                      <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                    ) : (
+                      <Circle size={13} className="text-gray-300 dark:text-slate-600 shrink-0" />
+                    )}
+                    <span className={todo.done ? 'line-through text-gray-400 dark:text-slate-500' : 'text-gray-700 dark:text-slate-200'}>
+                      {todo.text}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Render Place Item Card (matching user's reference design)
+    return (
+      <div
+        key={item.id || cardIdx}
+        onClick={() => handleOpenPlaceDetail(item)}
+        className="p-4 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs cursor-pointer hover:border-blue-400 hover:shadow-md transition-all space-y-3"
+      >
+        {/* Top row: Icon Badge + Title + Opening Hours + Category Badge & Image Thumbnail on Right */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3.5 flex-1">
+            <div
+              className="w-10 h-10 rounded-full text-white font-extrabold flex items-center justify-center shrink-0 mt-0.5 shadow-xs"
+              style={{ backgroundColor: itemSectionColor || '#2196F3' }}
+            >
+              {renderIconFromCode(itemIconCode, <MapPin size={18} />)}
+            </div>
+            <div className="space-y-1">
+              <h4 className="font-extrabold text-sm text-gray-900 dark:text-slate-100 leading-snug">
+                {title}
+              </h4>
+              {openingHoursStr && (
+                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-slate-400 font-medium">
+                  <Clock size={12} className="shrink-0 text-gray-400" />
+                  <span>{openingHoursStr}</span>
+                </div>
+              )}
+              {item.place.category?.name && (
+                <span className="inline-block px-2.5 py-0.5 bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 text-[11px] font-bold rounded-lg mt-0.5">
+                  {item.place.category.name}
+                </span>
+              )}
+            </div>
+          </div>
+          {placePhoto && (
+            <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0 border border-gray-100 dark:border-slate-800 bg-gray-100 dark:bg-slate-800 shadow-2xs">
+              <img src={placePhoto} alt={title} className="w-full h-full object-cover" />
+            </div>
+          )}
+        </div>
+
+        {/* Custom note by user */}
+        {customNote && (
+          <p className="text-xs text-gray-600 dark:text-slate-300 italic font-medium bg-gray-50/80 dark:bg-slate-950 p-2.5 rounded-xl border border-gray-100 dark:border-slate-800">
+            "{customNote}"
+          </p>
+        )}
+
+        {/* Action / Specs Badges Row */}
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-gray-100 dark:border-slate-800/80 text-xs">
+          {/* Ghé thăm */}
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 font-bold rounded-xl border transition-colors ${
+              item.isVisited
+                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/60'
+                : 'bg-gray-50 text-gray-400 dark:bg-slate-800/60 dark:text-slate-500 border-gray-100 dark:border-slate-800'
+            }`}
+          >
+            <CheckCircle2 size={13} className={item.isVisited ? 'text-emerald-600' : 'opacity-40'} />
+            {item.isVisited ? 'Đã ghé thăm' : 'Đánh dấu ghé thăm'}
+          </span>
+
+          {/* Giờ */}
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 font-bold rounded-xl border transition-colors ${
+              item.startTime || item.endTime
+                ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-900/60'
+                : 'bg-gray-50 text-gray-400 dark:bg-slate-800/60 dark:text-slate-500 border-gray-100 dark:border-slate-800'
+            }`}
+          >
+            <Clock size={13} className={item.startTime || item.endTime ? 'text-blue-600' : 'opacity-40'} />
+            {item.startTime || item.endTime ? `${item.startTime || '00:00'} - ${item.endTime || '00:00'}` : 'Thêm giờ'}
+          </span>
+
+          {/* Đính kèm */}
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 font-bold rounded-xl border transition-colors ${
+              attachments.length > 0
+                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-900/60'
+                : 'bg-gray-50 text-gray-400 dark:bg-slate-800/60 dark:text-slate-500 border-gray-100 dark:border-slate-800'
+            }`}
+          >
+            <Paperclip size={13} className={attachments.length > 0 ? 'text-indigo-600' : 'opacity-40'} />
+            {attachments.length > 0 ? `Đính kèm (${attachments.length})` : 'Đính kèm'}
+          </span>
+
+          {/* Chi phí / Giá */}
+          {expenseAmount && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-extrabold rounded-xl border border-purple-200 dark:border-purple-900/60">
+              <DollarSign size={13} className="text-purple-600" />
+              {expenseAmount}
+            </span>
+          )}
+
+          {/* Emojis / Reactions */}
+          {reactions.length > 0 ? (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 dark:bg-amber-950/60 rounded-full border border-amber-200 dark:border-amber-900 text-xs">
+              {reactions.map((r: any) => typeof r === 'string' ? r : (r.emoji || '😊')).join(' ')}
+            </span>
+          ) : (
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gray-50 dark:bg-slate-800 text-gray-400 border border-gray-100 dark:border-slate-800">
+              <Smile size={14} className="opacity-40" />
+            </span>
+          )}
+        </div>
+
+        {/* Todo Checklist items list if any */}
+        {todos.length > 0 && (
+          <div className="pt-2 border-t border-gray-100 dark:border-slate-800 space-y-1 pl-1">
+            {todos.map((todo, tIdx) => (
+              <div key={tIdx} className="flex items-center gap-2 text-xs">
+                {todo.done ? (
+                  <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                ) : (
+                  <Circle size={13} className="text-gray-300 dark:text-slate-600 shrink-0" />
+                )}
+                <span className={todo.done ? 'line-through text-gray-400 dark:text-slate-500' : 'text-gray-700 dark:text-slate-200'}>
+                  {todo.text}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   // Main Tab State
@@ -140,6 +652,17 @@ export default function ItinerariesPage() {
   const [tripDetailLoading, setTripDetailLoading] = useState(false);
   const [selectedTripDetail, setSelectedTripDetail] = useState<any>(null);
   const [tripDetailActiveTab, setTripDetailActiveTab] = useState<'days' | 'overview' | 'expenses' | 'members'>('days');
+
+  // Place Detail Modal State
+  const [selectedPlaceItem, setSelectedPlaceItem] = useState<any>(null);
+  const [isPlaceDetailOpen, setIsPlaceDetailOpen] = useState(false);
+
+  const handleOpenPlaceDetail = (item: any) => {
+    setSelectedPlaceItem(item);
+    setIsPlaceDetailOpen(true);
+  };
+
+
 
   const [isDeleteTripOpen, setIsDeleteTripOpen] = useState(false);
   const [deletingTripId, setDeletingTripId] = useState<number | string | null>(null);
@@ -587,7 +1110,7 @@ export default function ItinerariesPage() {
             <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-4 text-white shadow-xs">
               <span className="text-xs font-semibold uppercase text-amber-100 block">Tổng thực chi ghi nhận</span>
               <span className="text-xl font-extrabold block mt-1">
-                {trips.reduce((sum, t) => sum + (t.expenses?.reduce((a, b) => a + (b.amount || 0), 0) || 0), 0).toLocaleString('vi-VN')} đ
+                {Math.round(trips.reduce((sum, t) => sum + (t.expenses?.reduce((a: number, b: any) => a + convertExpenseToItineraryCurrency(b, t), 0) || 0), 0)).toLocaleString('vi-VN')} đ
               </span>
             </div>
           </div>
@@ -678,8 +1201,8 @@ export default function ItinerariesPage() {
                         </td>
 
                         <td className="px-6 py-3.5 text-xs space-y-0.5">
-                          <span className="block text-gray-500">Dự toán: <strong>{t.budget ? `${t.budget.toLocaleString('vi-VN')} đ` : 'Chưa đặt'}</strong></span>
-                          <span className="block text-emerald-600 font-semibold">Ghi nhận: {(t.expenses?.reduce((a, b) => a + (b.amount || 0), 0) || 0).toLocaleString('vi-VN')} đ</span>
+                          <span className="block text-gray-500">Dự toán: <strong>{t.budget ? `${t.budget.toLocaleString('vi-VN')} ${t.currencySymbol || 'đ'}` : 'Chưa đặt'}</strong></span>
+                          <span className="block text-emerald-600 font-semibold">Ghi nhận: {Math.round(t.expenses?.reduce((a: number, b: any) => a + convertExpenseToItineraryCurrency(b, t), 0) || 0).toLocaleString('vi-VN')} {t.currencySymbol || 'đ'}</span>
                         </td>
 
                         <td className="px-6 py-3.5">
@@ -688,15 +1211,25 @@ export default function ItinerariesPage() {
                         </td>
 
                         <td className="px-6 py-3.5">
-                          {t.isAi ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700">
-                              <Sparkles size={12} /> AI tự ren
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700">
-                              <User size={12} /> Tự tạo
-                            </span>
-                          )}
+                          <div className="flex flex-col gap-1 items-start">
+                            {t.isAi ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700">
+                                <Sparkles size={12} /> AI tự ren
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700">
+                                <User size={12} /> Tự tạo
+                              </span>
+                            )}
+                            {(() => {
+                              const priv = getPrivacyBadgeInfo(null, t);
+                              return (
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold border ${priv.badgeClass}`}>
+                                  {priv.icon} {priv.label}
+                                </span>
+                              );
+                            })()}
+                          </div>
                         </td>
 
                         <td className="px-6 py-3.5 text-center">
@@ -733,9 +1266,6 @@ export default function ItinerariesPage() {
       {/* ========================================================================= */}
       {mainTab === 'guides' && (
         <div className="space-y-6">
-          <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 text-amber-800 dark:text-amber-300 text-xs font-medium">
-            💡 <strong>Lưu ý nghiệp vụ:</strong> Bài Hướng dẫn du lịch chỉ sử dụng bảng <code>Itinerary</code> và <code>ItinerarySavedPlace</code> (địa điểm lưu tổng quan). Bài Hướng dẫn <strong>không có Lịch trình theo ngày (ItineraryDetail)</strong> và <strong>không có Quản lý chi tiêu (ItineraryExpense)</strong>.
-          </div>
 
           <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
             <div className="p-4 border-b border-gray-200 dark:border-slate-800 flex justify-between items-center">
@@ -783,7 +1313,6 @@ export default function ItinerariesPage() {
                               <Eye size={14} />
                               Xem chi tiết
                             </button>
-                            <button onClick={() => handleOpenExportBlog(g)} className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg cursor-pointer">Xuất Blog</button>
                           </div>
                         </td>
                       </tr>
@@ -939,7 +1468,7 @@ export default function ItinerariesPage() {
               <>
                 <div className="relative h-44 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 overflow-hidden shrink-0">
                   {selectedTripDetail.coverImage && (
-                    <img src={selectedTripDetail.coverImage} alt="Cover" className="w-full h-full object-cover opacity-40" />
+                    <img src={selectedTripDetail.coverImage} alt="Cover" className="w-full h-full object-cover opacity-50" />
                   )}
                   <button
                     onClick={() => setIsTripDetailOpen(false)}
@@ -953,6 +1482,15 @@ export default function ItinerariesPage() {
                         <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-blue-600 text-white">
                           {selectedTripDetail.isAi ? '⚡ AI tự ren' : '✍️ Tự tạo'}
                         </span>
+                        {(() => {
+                          const priv = getPrivacyBadgeInfo(null, selectedTripDetail);
+                          return (
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold border flex items-center gap-1 backdrop-blur-xs ${priv.bannerBadgeClass}`}>
+                              {priv.icon}
+                              {priv.label}
+                            </span>
+                          );
+                        })()}
                         <span className="text-xs text-blue-200 font-semibold flex items-center gap-1">
                           <MapPin size={12} /> {selectedTripDetail.destination}
                         </span>
@@ -965,7 +1503,7 @@ export default function ItinerariesPage() {
                     <div className="text-right">
                       <span className="text-xs text-slate-300 block">Dự toán chuyến đi</span>
                       <span className="text-lg font-black text-amber-400">
-                        {selectedTripDetail.budget ? `${selectedTripDetail.budget.toLocaleString('vi-VN')} đ` : 'Tự do'}
+                        {selectedTripDetail.budget ? `${selectedTripDetail.budget.toLocaleString('vi-VN')} ${selectedTripDetail.currencySymbol || 'đ'}` : 'Tự do'}
                       </span>
                     </div>
                   </div>
@@ -986,7 +1524,7 @@ export default function ItinerariesPage() {
                   <div className="flex items-center gap-4 text-gray-600 dark:text-slate-300 font-medium">
                     <span>🗓️ {selectedTripDetail.days ? `${selectedTripDetail.days} ngày` : 'Nhiều ngày'}</span>
                     <span>👥 {selectedTripDetail.members?.length || 1} thành viên</span>
-                    <span>💰 Thực chi: <strong>{(selectedTripDetail.expenses?.reduce((a: any, b: any) => a + (b.amount || 0), 0) || 0).toLocaleString('vi-VN')} đ</strong></span>
+                    <span>💰 Thực chi: <strong>{Math.round(selectedTripDetail.expenses?.reduce((a: any, b: any) => a + convertExpenseToItineraryCurrency(b, selectedTripDetail), 0) || 0).toLocaleString('vi-VN')} {selectedTripDetail.currencySymbol || 'đ'}</strong></span>
                   </div>
                 </div>
 
@@ -1064,16 +1602,49 @@ export default function ItinerariesPage() {
                             {Object.keys(groupedByDay).map((dayStr) => {
                               const dayNum = Number(dayStr);
                               const dayItems = groupedByDay[dayNum];
+                              dayItems.sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0));
+
+                              // Extract dayConfig for this day from selectedTripDetail.dayConfigs
+                              const dayConfig = (() => {
+                                if (!selectedTripDetail?.dayConfigs) return null;
+                                let configs = selectedTripDetail.dayConfigs;
+                                if (typeof configs === 'string') {
+                                  try {
+                                    configs = JSON.parse(configs);
+                                  } catch (_) {}
+                                }
+                                if (configs && typeof configs === 'object') {
+                                  return configs[dayNum.toString()] || configs[dayNum] || null;
+                                }
+                                return null;
+                              })();
+
+                              const dayColor = dayConfig?.color ? parseSectionColor(dayConfig.color) : null;
+                              const dayIconCode = dayConfig?.iconCode || dayConfig?.icon || dayConfig?.icon_code || null;
+                              const dayTitle = dayConfig?.title || dayConfig?.subTitle || dayConfig?.name || null;
+
                               return (
-                                <div key={dayNum} className="border border-gray-200 dark:border-slate-800 rounded-2xl p-4 bg-gray-50/50 dark:bg-slate-950/40 space-y-3">
+                                <div
+                                  key={dayNum}
+                                  className="border border-gray-200 dark:border-slate-800 rounded-2xl p-4 bg-gray-50/50 dark:bg-slate-950/40 space-y-3"
+                                >
                                   {/* Day Header */}
                                   <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 pb-2.5">
                                     <div className="flex items-center gap-2">
-                                      <span className="px-3 py-1 bg-blue-600 text-white font-extrabold text-xs rounded-xl">
-                                        Ngày {dayNum} {selectedTripDetail.days ? `/ ${selectedTripDetail.days}` : ''}
+                                      <span
+                                        className="px-3 py-1 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow-2xs"
+                                        style={{ backgroundColor: dayColor || '#2563eb' }}
+                                      >
+                                        {dayIconCode && renderIconFromCode(dayIconCode, null)}
+                                        <span>Ngày {dayNum} {selectedTripDetail.days ? `/ ${selectedTripDetail.days}` : ''}</span>
                                       </span>
-                                      <span className="text-xs font-bold text-gray-700 dark:text-slate-300">
-                                        {dayItems.length > 0 ? `${dayItems.length} địa điểm` : 'Lịch trình tự do'}
+                                      {dayTitle && (
+                                        <span className="text-xs font-extrabold text-gray-800 dark:text-slate-200">
+                                          • {dayTitle}
+                                        </span>
+                                      )}
+                                      <span className="text-xs font-bold text-gray-500 dark:text-slate-400">
+                                        ({dayItems.length > 0 ? `${dayItems.length} địa điểm` : 'Lịch trình tự do'})
                                       </span>
                                     </div>
                                   </div>
@@ -1083,50 +1654,7 @@ export default function ItinerariesPage() {
                                     <p className="text-xs text-gray-400 italic py-2">Chưa cập nhật địa điểm cho Ngày {dayNum}.</p>
                                   ) : (
                                     <div className="space-y-2.5">
-                                      {dayItems.map((item: any, idx: number) => {
-                                        const isPlace = !!item.place;
-                                        const isPlaceholderNote = !item.noteText || item.noteText === 'Thêm ghi chú tại đây';
-                                        
-                                        const title = isPlace 
-                                          ? item.place.name 
-                                          : (!isPlaceholderNote ? item.noteText : 'Ghi chú / Hoạt động cá nhân');
-
-                                        const subtitle = isPlace 
-                                          ? (!isPlaceholderNote ? item.noteText : formatAddress(item.place.address))
-                                          : null;
-
-                                        const cleanSubtitle = (subtitle && subtitle !== 'Thêm ghi chú tại đây') ? subtitle : null;
-
-                                        return (
-                                          <div key={item.id || idx} className="p-3.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-start gap-3 shadow-xs">
-                                            {isPlace ? (
-                                              <MapPin size={18} className="text-blue-500 shrink-0 mt-0.5" />
-                                            ) : (
-                                              <FileText size={18} className="text-amber-500 shrink-0 mt-0.5" />
-                                            )}
-                                            <div className="flex-1 space-y-1">
-                                              <div className="flex items-center justify-between">
-                                                <h4 className="font-bold text-sm text-gray-900 dark:text-slate-100">
-                                                  {title}
-                                                </h4>
-                                                {item.isVisited && (
-                                                  <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md flex items-center gap-1">
-                                                    <CheckCircle2 size={12} /> Đã ghé thăm
-                                                  </span>
-                                                )}
-                                              </div>
-                                              {cleanSubtitle && (
-                                                <p className="text-xs text-gray-500 dark:text-slate-400">{cleanSubtitle}</p>
-                                              )}
-                                              {(item.startTime || item.endTime) && (
-                                                <span className="text-xs font-semibold text-blue-600 dark:bg-blue-400 block pt-0.5">
-                                                  ⏰ Thời gian: {item.startTime || '00:00'} - {item.endTime || '00:00'}
-                                                </span>
-                                              )}
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
+                                      {dayItems.map((item: any, idx: number) => renderItineraryItemCard(item, idx, dayColor))}
                                     </div>
                                   )}
                                 </div>
@@ -1140,60 +1668,265 @@ export default function ItinerariesPage() {
 
                   {/* TAB: LƯU TỔNG QUAN */}
                   {tripDetailActiveTab === 'overview' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {selectedTripDetail.savedPlaces?.length === 0 ? (
-                        <p className="text-gray-400 italic text-sm text-center py-6 col-span-2">Chưa có địa điểm lưu tổng quan.</p>
-                      ) : (
-                        selectedTripDetail.savedPlaces?.map((sp: any) => {
-                          const isPlace = !!sp.place;
-                          const isPlaceholderNote = !sp.noteText || sp.noteText === 'Thêm ghi chú tại đây';
+                    <div className="space-y-4">
+                      {(() => {
+                        const grouped = groupSavedPlacesBySection(
+                          selectedTripDetail.sections,
+                          selectedTripDetail.savedPlaces
+                        );
 
-                          const title = isPlace 
-                            ? sp.place.name 
-                            : (!isPlaceholderNote ? sp.noteText : (sp.section || 'Ghi chú tổng quan'));
+                        if (grouped.length === 0 || selectedTripDetail.savedPlaces?.length === 0) {
+                          return (
+                            <p className="text-gray-400 italic text-sm text-center py-6">
+                              Chưa có địa điểm lưu tổng quan.
+                            </p>
+                          );
+                        }
 
-                          const rawSub = isPlace 
-                            ? (!isPlaceholderNote ? sp.noteText : formatAddress(sp.place.address))
-                            : null;
-
-                          const cleanSub = (rawSub && rawSub !== 'Thêm ghi chú tại đây') ? rawSub : null;
+                        return grouped.map(({ section, items }, idx) => {
+                          const isChecklist = section.sectionType === 'CHECKLIST';
+                          const sectionColor = parseSectionColor(section.colorCode);
 
                           return (
-                            <div key={sp.id} className="p-3.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-950 flex items-start gap-3">
-                              {isPlace ? (
-                                <MapPin size={20} className="text-blue-500 shrink-0 mt-0.5" />
-                              ) : (
-                                <FileText size={20} className="text-amber-500 shrink-0 mt-0.5" />
-                              )}
-                              <div>
-                                <h5 className="font-bold text-sm text-gray-900 dark:text-slate-100">{title}</h5>
-                                {cleanSub && <p className="text-xs text-gray-500 mt-1">{cleanSub}</p>}
+                            <div
+                              key={section.id || section.name || idx}
+                              className="border border-gray-200 dark:border-slate-800 rounded-2xl p-4 bg-gray-50/50 dark:bg-slate-950/40 space-y-3 shadow-2xs"
+                            >
+                              {/* Section Header (ItinerarySection) */}
+                              <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 pb-2.5">
+                                <div className="flex items-center gap-2.5">
+                                  <div
+                                    className="w-7 h-7 rounded-lg flex items-center justify-center font-bold shrink-0 text-white"
+                                    style={{
+                                      backgroundColor: sectionColor || (isChecklist ? '#d97706' : '#2563eb'),
+                                    }}
+                                  >
+                                    {isChecklist ? <CheckSquare size={15} /> : <Layers size={15} />}
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <h4
+                                        className="font-bold text-sm text-gray-900 dark:text-slate-100"
+                                        style={{ color: sectionColor || undefined }}
+                                      >
+                                        {section.name}
+                                      </h4>
+                                      {isChecklist && (
+                                        <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 rounded-md">
+                                          Checklist
+                                        </span>
+                                      )}
+                                    </div>
+                                    {section.subTitle && (
+                                      <p className="text-xs text-gray-500 dark:text-slate-400">
+                                        {section.subTitle}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                                <span className="text-xs font-bold text-gray-600 dark:text-slate-400 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 px-2.5 py-1 rounded-xl">
+                                  {items.length} địa điểm
+                                </span>
                               </div>
+
+                              {/* Section Child Items (ItinerarySavedPlace) */}
+                              {items.length === 0 ? (
+                                <p className="text-xs text-gray-400 italic py-2">
+                                  Chưa có địa điểm hoặc ghi chú nào trong mục này.
+                                </p>
+                              ) : (
+                                <div className="space-y-2.5">
+                                  {items.map((sp: any, idx: number) => renderItineraryItemCard(sp, idx, sectionColor))}
+                                </div>
+                              )}
                             </div>
                           );
-                        })
-                      )}
+                        });
+                      })()}
                     </div>
                   )}
 
-                  {/* TAB: CHI TIÊU */}
+                  {/* TAB: CHI TIÊU & QUYẾT TOÁN */}
                   {tripDetailActiveTab === 'expenses' && (
-                    <div className="space-y-3">
-                      {selectedTripDetail.expenses?.length === 0 ? (
-                        <p className="text-gray-400 italic text-sm text-center py-6">Chưa có thông tin ghi nhận chi tiêu.</p>
-                      ) : (
-                        selectedTripDetail.expenses?.map((e: any) => (
-                          <div key={e.id} className="p-4 rounded-2xl border border-gray-200 dark:border-slate-800 bg-emerald-50/30 dark:bg-emerald-950/20 flex items-center justify-between">
-                            <div>
-                              <span className="font-bold text-sm text-gray-900 dark:text-slate-100 block">{e.title}</span>
-                              <span className="text-xs text-gray-500">Danh mục: <strong>{e.category || 'Khác'}</strong> • Chi bởi: <strong>{e.payer || 'User'}</strong></span>
+                    <div className="space-y-5">
+                      {/* Summary Stat Cards */}
+                      {(() => {
+                        const expensesList = selectedTripDetail.expenses || [];
+                        const directSettlements = selectedTripDetail.settlements || [];
+                        const expenseSettlements = (selectedTripDetail.expenses || []).flatMap((e: any) => e.settlements || []);
+                        const settlementsMap = new Map();
+                        [...directSettlements, ...expenseSettlements].forEach((st: any) => {
+                          if (st && st.id) settlementsMap.set(st.id.toString(), st);
+                        });
+                        const settlementsList = Array.from(settlementsMap.values());
+
+                        const totalSpent = Math.round(expensesList.reduce((acc: number, curr: any) => acc + convertExpenseToItineraryCurrency(curr, selectedTripDetail), 0));
+                        const totalSettled = settlementsList.reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0);
+                        const currSym = selectedTripDetail.currencySymbol || 'đ';
+                        const budget = selectedTripDetail.budget;
+                        const remaining = budget ? budget - totalSpent : null;
+
+                        return (
+                          <>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              {/* Dự toán */}
+                              <div className="p-4 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
+                                <span className="text-xs font-bold text-gray-500 block mb-1">Dự toán ngân sách</span>
+                                <span className="text-lg font-black text-amber-500">
+                                  {budget ? `${budget.toLocaleString('vi-VN')} ${currSym}` : 'Tự do'}
+                                </span>
+                              </div>
+
+                              {/* Thực chi */}
+                              <div className="p-4 rounded-2xl border border-emerald-100 dark:border-emerald-900/40 bg-emerald-50/50 dark:bg-emerald-950/20 shadow-2xs">
+                                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 block mb-1">Tổng đã chi</span>
+                                <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">
+                                  {totalSpent.toLocaleString('vi-VN')} {currSym}
+                                </span>
+                              </div>
+
+                              {/* Còn lại */}
+                              <div className="p-4 rounded-2xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-950/20 shadow-2xs">
+                                <span className="text-xs font-bold text-blue-700 dark:text-blue-300 block mb-1">
+                                  {remaining !== null && remaining < 0 ? 'Vượt dự toán' : 'Còn lại'}
+                                </span>
+                                <span className={`text-lg font-black ${remaining !== null && remaining < 0 ? 'text-rose-600' : 'text-blue-600 dark:text-blue-400'}`}>
+                                  {remaining !== null ? `${remaining.toLocaleString('vi-VN')} ${currSym}` : 'Không giới hạn'}
+                                </span>
+                              </div>
                             </div>
-                            <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400">
-                              {e.amount?.toLocaleString('vi-VN')} {e.currencySymbol || 'đ'}
-                            </span>
-                          </div>
-                        ))
-                      )}
+
+                            {/* List 1: Danh sách Khoản chi (ItineraryExpense) */}
+                            <div className="space-y-3 pt-2">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-xs font-extrabold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                                  <Receipt size={14} className="text-emerald-500" /> Danh sách khoản chi ({expensesList.length})
+                                </h4>
+                              </div>
+
+                              {expensesList.length === 0 ? (
+                                <p className="text-gray-400 italic text-xs text-center py-4 bg-gray-50 dark:bg-slate-950 rounded-2xl">
+                                  Chưa có ghi nhận khoản chi tiêu nào.
+                                </p>
+                              ) : (
+                                <div className="space-y-3">
+                                  {expensesList.map((e: any) => {
+                                    const linkedPlaceName = e.savedPlace?.place?.name || e.detail?.place?.name;
+                                    const hasSettlements = e.settlements && e.settlements.length > 0;
+
+                                    return (
+                                      <div
+                                        key={e.id}
+                                        className="p-4 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-3"
+                                      >
+                                        {/* Top Header Row */}
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                                              {renderIconFromCode(e.category, <Receipt size={18} />)}
+                                            </div>
+                                            <div>
+                                              <h5 className="font-extrabold text-sm text-gray-900 dark:text-slate-100">
+                                                {e.title}
+                                              </h5>
+                                              <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500">
+                                                <span className="px-2 py-0.5 bg-gray-100 dark:bg-slate-800 rounded-md font-bold text-[11px] text-gray-700 dark:text-slate-300">
+                                                  {e.category || 'Khác'}
+                                                </span>
+                                                {e.date && <span>• 🗓️ {e.date}</span>}
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          <span className="text-base font-black text-emerald-600 dark:text-emerald-400 shrink-0">
+                                            {e.amount?.toLocaleString('vi-VN')} {e.currencySymbol || currSym}
+                                          </span>
+                                        </div>
+
+                                        {/* Detail attributes: Payer, Share, Linked Place */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-2 border-t border-gray-100 dark:border-slate-800 text-gray-600 dark:text-slate-300">
+                                          <div>
+                                            <span className="text-gray-400">👤 Người thanh toán: </span>
+                                            <strong className="text-gray-800 dark:text-slate-200">{e.payer || 'Không rõ'}</strong>
+                                          </div>
+                                          <div>
+                                            <span className="text-gray-400">👥 Phân chia: </span>
+                                            <strong className="text-gray-800 dark:text-slate-200">{e.share || 'Không chia'}</strong>
+                                          </div>
+                                          {linkedPlaceName && (
+                                            <div className="col-span-1 sm:col-span-2 text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1">
+                                              <MapPin size={12} /> Gắn với địa điểm: <strong>{linkedPlaceName}</strong>
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {/* Linked Settlements */}
+                                        {hasSettlements && (
+                                          <div className="p-3 bg-purple-50/60 dark:bg-purple-950/20 rounded-xl border border-purple-100 dark:border-purple-900/30 text-xs space-y-1.5">
+                                            <span className="font-bold text-purple-700 dark:text-purple-300 block text-[11px] uppercase tracking-wider">
+                                              💸 Lịch sử quyết toán khoản này ({e.settlements.length}):
+                                            </span>
+                                            {e.settlements.map((s: any) => (
+                                              <div key={s.id} className="flex justify-between items-center text-purple-900 dark:text-purple-200 font-medium">
+                                                <span>
+                                                  👤 <strong>{s.fromName}</strong> ➔ <strong>{s.toName}</strong>
+                                                </span>
+                                                <span className="font-extrabold text-purple-600 dark:text-purple-400">
+                                                  {s.amount?.toLocaleString('vi-VN')} {currSym}
+                                                </span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* List 2: Danh sách Quyết toán nhóm (ItinerarySettlement) */}
+                            <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-slate-800">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-xs font-extrabold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                                  <Receipt size={14} className="text-purple-500" /> Lịch sử quyết toán nhóm (ItinerarySettlement) ({settlementsList.length})
+                                </h4>
+                              </div>
+
+                              {settlementsList.length === 0 ? (
+                                <p className="text-gray-400 italic text-xs text-center py-4 bg-gray-50 dark:bg-slate-950 rounded-2xl">
+                                  Chưa có giao dịch quyết toán nhóm nào.
+                                </p>
+                              ) : (
+                                <div className="space-y-2.5">
+                                  {settlementsList.map((s: any) => (
+                                    <div
+                                      key={s.id}
+                                      className="p-3.5 rounded-2xl border border-purple-100 dark:border-purple-900/40 bg-purple-50/40 dark:bg-purple-950/20 flex items-center justify-between text-xs"
+                                    >
+                                      <div className="space-y-0.5">
+                                        <div className="font-bold text-gray-900 dark:text-slate-100 flex items-center gap-1.5">
+                                          <span className="text-purple-600 dark:text-purple-400 font-extrabold">{s.fromName}</span>
+                                          <span className="text-gray-400">chuyển cho</span>
+                                          <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">{s.toName}</span>
+                                        </div>
+                                        {s.date && (
+                                          <span className="text-[11px] text-gray-400 block">
+                                            ⏱️ {new Date(s.date).toLocaleDateString('vi-VN')} {new Date(s.date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="text-sm font-black text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/60 px-3 py-1 rounded-xl">
+                                        {s.amount?.toLocaleString('vi-VN')} {currSym}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   )}
 
@@ -1248,69 +1981,141 @@ export default function ItinerariesPage() {
               </div>
             ) : selectedGuideDetail ? (
               <>
-                <div className="p-6 border-b border-gray-200 dark:border-slate-800 flex justify-between items-start bg-gray-50/50 dark:bg-slate-950">
-                  <div>
-                    <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md inline-block mb-1">
-                      📖 Hướng dẫn du lịch (Travel Guide)
-                    </span>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-slate-100">{selectedGuideDetail.title}</h3>
-                    <span className="text-xs text-gray-500 mt-1 block">Điểm đến: <strong>{selectedGuideDetail.destination}</strong> • Tác giả: <strong>{selectedGuideDetail.user?.fullName}</strong></span>
-                  </div>
-                  <button onClick={() => setIsGuideDetailOpen(false)} className="p-2 text-gray-400 hover:text-gray-600 rounded-xl cursor-pointer">
+                {/* Banner & Header */}
+                <div className="relative h-44 bg-gradient-to-r from-indigo-900 via-purple-900 to-slate-900 overflow-hidden shrink-0">
+                  {selectedGuideDetail.coverImage && (
+                    <img src={selectedGuideDetail.coverImage} alt="Cover" className="w-full h-full object-cover opacity-50" />
+                  )}
+                  <button
+                    onClick={() => setIsGuideDetailOpen(false)}
+                    className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-black/70 text-white rounded-full transition-colors cursor-pointer z-10"
+                  >
                     <X size={20} />
                   </button>
+                  <div className="absolute bottom-4 left-6 right-6 flex justify-between items-end text-white">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-indigo-600 text-white">
+                          📖 Hướng dẫn du lịch
+                        </span>
+                        {(() => {
+                          const priv = getPrivacyBadgeInfo(null, selectedGuideDetail);
+                          return (
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold border flex items-center gap-1 backdrop-blur-xs ${priv.bannerBadgeClass}`}>
+                              {priv.icon}
+                              {priv.label}
+                            </span>
+                          );
+                        })()}
+                        <span className="text-xs text-indigo-200 font-semibold flex items-center gap-1">
+                          <MapPin size={12} /> {selectedGuideDetail.destination}
+                        </span>
+                      </div>
+                      <h2 className="text-2xl font-extrabold tracking-wide drop-shadow-md">
+                        {selectedGuideDetail.title}
+                      </h2>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-xs text-slate-300 block">Địa điểm gợi ý</span>
+                      <span className="text-lg font-black text-amber-400">
+                        {selectedGuideDetail.savedPlaces?.length || 0} địa điểm
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="px-6 py-3 bg-amber-50 dark:bg-amber-950/20 border-b border-amber-100 dark:border-amber-900/30 text-amber-800 dark:text-amber-300 text-xs font-medium flex items-center gap-2">
-                  <AlertCircle size={16} className="shrink-0 text-amber-600" />
-                  Bài Hướng dẫn du lịch chỉ lưu danh sách các địa điểm lưu gợi ý ở tổng quan (ItinerarySavedPlace). Không có phần Lịch trình theo ngày hay Quản lý chi tiêu.
+                {/* Sub Header info bar */}
+                <div className="px-6 py-3 bg-gray-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-indigo-100 overflow-hidden shrink-0 border border-indigo-200">
+                      <img src={selectedGuideDetail.user?.avatar || '/default-avatar.jpg'} alt="User" className="w-full h-full object-cover" />
+                    </div>
+                    <div>
+                      <span className="font-bold text-gray-900 dark:text-slate-100 block">{selectedGuideDetail.user?.fullName || 'Tác giả'}</span>
+                      <span className="text-gray-400 block">{selectedGuideDetail.user?.email || 'N/A'}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 text-gray-600 dark:text-slate-300 font-medium">
+                    <span>📍 {selectedGuideDetail.destination}</span>
+                    <span>📌 {selectedGuideDetail.savedPlaces?.length || 0} địa điểm gợi ý</span>
+                  </div>
                 </div>
 
-                <div className="p-6 flex-1 overflow-y-auto space-y-3">
-                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Danh sách địa điểm lưu gợi ý ({selectedGuideDetail.savedPlaces?.length || 0})</h4>
-                  {selectedGuideDetail.savedPlaces?.length === 0 ? (
-                    <p className="text-gray-400 italic text-sm text-center py-6">Chưa có địa điểm lưu nào.</p>
-                  ) : (
-                    selectedGuideDetail.savedPlaces?.map((sp: any) => {
-                      const isPlace = !!sp.place;
-                      const isPlaceholderNote = !sp.noteText || sp.noteText === 'Thêm ghi chú tại đây';
+                <div className="p-6 flex-1 overflow-y-auto space-y-4">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    Danh sách địa điểm lưu gợi ý ({selectedGuideDetail.savedPlaces?.length || 0})
+                  </h4>
+                  {(() => {
+                    const grouped = groupSavedPlacesBySection(
+                      selectedGuideDetail.sections,
+                      selectedGuideDetail.savedPlaces
+                    );
 
-                      const title = isPlace 
-                        ? sp.place.name 
-                        : (!isPlaceholderNote ? sp.noteText : (sp.section || 'Ghi chú gợi ý'));
+                    if (grouped.length === 0 || selectedGuideDetail.savedPlaces?.length === 0) {
+                      return (
+                        <p className="text-gray-400 italic text-sm text-center py-6">
+                          Chưa có địa điểm lưu nào.
+                        </p>
+                      );
+                    }
 
-                      const rawSub = isPlace 
-                        ? (!isPlaceholderNote ? sp.noteText : formatAddress(sp.place.address))
-                        : null;
-
-                      const cleanSub = (rawSub && rawSub !== 'Thêm ghi chú tại đây') ? rawSub : null;
+                    return grouped.map(({ section, items }, idx) => {
+                      const isChecklist = section.sectionType === 'CHECKLIST';
+                      const sectionColor = parseSectionColor(section.colorCode);
 
                       return (
-                        <div key={sp.id} className="p-4 rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-950 flex items-start gap-4">
-                          <div className="w-12 h-12 rounded-xl bg-indigo-50 overflow-hidden shrink-0 flex items-center justify-center border border-indigo-100">
-                            {sp.place?.image ? (
-                              <img src={sp.place.image} alt="Place" className="w-full h-full object-cover" />
-                            ) : isPlace ? (
-                              <MapPin size={22} className="text-indigo-500" />
-                            ) : (
-                              <FileText size={22} className="text-amber-500" />
-                            )}
+                        <div
+                          key={section.id || section.name || idx}
+                          className="border border-gray-200 dark:border-slate-800 rounded-2xl p-4 bg-gray-50/50 dark:bg-slate-950/40 space-y-3"
+                        >
+                          {/* Section Header */}
+                          <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 pb-2.5">
+                            <div className="flex items-center gap-2.5">
+                              <div
+                                className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold shrink-0 ${
+                                  isChecklist
+                                    ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400'
+                                    : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400'
+                                }`}
+                              >
+                                {isChecklist ? <CheckSquare size={15} /> : <Layers size={15} />}
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-sm text-gray-900 dark:text-slate-100">
+                                  {section.name}
+                                </h4>
+                                {section.subTitle && (
+                                  <p className="text-xs text-gray-500 dark:text-slate-400">
+                                    {section.subTitle}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <span className="text-xs font-bold text-gray-600 dark:text-slate-400 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 px-2.5 py-1 rounded-xl">
+                              {items.length} địa điểm
+                            </span>
                           </div>
-                          <div className="flex-1">
-                            <h5 className="font-bold text-sm text-gray-900 dark:text-slate-100">{title}</h5>
-                            {cleanSub && <p className="text-xs text-gray-500 mt-1">{cleanSub}</p>}
-                          </div>
+
+                          {/* Section Items */}
+                          {items.length === 0 ? (
+                            <p className="text-xs text-gray-400 italic py-2">
+                              Chưa có địa điểm trong mục này.
+                            </p>
+                          ) : (
+                            <div className="space-y-2.5">
+                              {items.map((sp: any, iIdx: number) => renderItineraryItemCard(sp, iIdx, sectionColor))}
+                            </div>
+                          )}
                         </div>
                       );
-                    })
-                  )}
+                    });
+                  })()}
                 </div>
 
                 <div className="p-4 border-t border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-950 flex justify-end gap-3">
-                  <button onClick={() => setIsGuideDetailOpen(false)} className="px-4 py-2 border border-gray-200 dark:border-slate-800 text-xs font-bold rounded-xl text-gray-600">Đóng</button>
-                  <button onClick={() => { setIsGuideDetailOpen(false); handleOpenExportBlog(selectedGuideDetail); }} className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl cursor-pointer">
-                    Xuất bài Hướng dẫn này thành Blog
-                  </button>
+                  <button onClick={() => setIsGuideDetailOpen(false)} className="px-4 py-2 border border-gray-200 dark:border-slate-800 text-xs font-bold rounded-xl text-gray-600 hover:bg-gray-100 dark:hover:bg-slate-900 transition-colors cursor-pointer">Đóng</button>
                 </div>
               </>
             ) : null}
@@ -1469,6 +2274,509 @@ export default function ItinerariesPage() {
           </div>
         </div>
       )}
+
+      {/* MODAL: CHI TIẾT ĐỊA ĐIỂM / GHI CHÚ / CONG VIEC (DETAIL MODAL) */}
+      {isPlaceDetailOpen && selectedPlaceItem && (() => {
+        const isPlace = !!selectedPlaceItem.place;
+
+        // RENDER DEDICATED MODAL FOR NOTE OR TODO CHECKLIST ITEM
+        if (!isPlace) {
+          const rawTitle = selectedPlaceItem.noteText || 'Ghi chú / Công việc';
+          const todos = parseTodoItems(selectedPlaceItem.todoItems);
+          const isTodoItem = todos.length > 0 || (rawTitle && rawTitle.startsWith('[TODO]'));
+          const title = rawTitle ? rawTitle.replace(/^\[TODO\]\s*/i, '') : rawTitle;
+          const doneCount = todos.filter((t: any) => t.done).length;
+          const totalCount = todos.length;
+          const attachments = parseJsonArray(selectedPlaceItem.attachments);
+          const reactions = parseJsonArray(selectedPlaceItem.reactions);
+
+          return (
+            <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200">
+              <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl border border-gray-200 dark:border-slate-800 flex flex-col max-h-[85vh] my-auto">
+                {/* Header Bar */}
+                <div
+                  className={`p-6 border-b flex items-start justify-between ${
+                    isTodoItem
+                      ? 'bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-900/40'
+                      : 'bg-amber-50/70 dark:bg-amber-950/40 border-amber-100 dark:border-amber-900/40'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs ${
+                        isTodoItem ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white'
+                      }`}
+                    >
+                      {isTodoItem ? <CheckSquare size={20} /> : <FileText size={20} />}
+                    </div>
+                    <div className="space-y-1">
+                      <span
+                        className={`text-[11px] font-extrabold uppercase px-2.5 py-0.5 rounded-lg inline-block ${
+                          isTodoItem
+                            ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300'
+                            : 'bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300'
+                        }`}
+                      >
+                        {isTodoItem ? '☑️ Danh sách công việc (Checklist)' : '📝 Ghi chú riêng (Note)'}
+                      </span>
+                      <h3 className="text-lg font-extrabold text-gray-900 dark:text-slate-100 leading-snug">
+                        {title}
+                      </h3>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsPlaceDetailOpen(false)}
+                    className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 rounded-full transition-colors cursor-pointer shrink-0"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* Body Content */}
+                <div className="p-6 overflow-y-auto space-y-4 flex-1">
+                  {/* Meta Info (Section & Day) */}
+                  <div className="flex flex-wrap items-center gap-3 text-xs bg-gray-50 dark:bg-slate-950 p-3 rounded-2xl border border-gray-100 dark:border-slate-800 text-gray-600 dark:text-slate-400">
+                    {selectedPlaceItem.section && (
+                      <div>
+                        Mục (Section): <strong className="text-gray-900 dark:text-slate-100">{selectedPlaceItem.section}</strong>
+                      </div>
+                    )}
+                    {selectedPlaceItem.day && (
+                      <div>
+                        • Lịch trình: <strong className="text-gray-900 dark:text-slate-100">Ngày {selectedPlaceItem.day}</strong>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Content Display */}
+                  {isTodoItem ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-xs font-bold">
+                        <span className="text-gray-500">Các mục cần hoàn thành ({doneCount}/{totalCount})</span>
+                        <span className={doneCount === totalCount && totalCount > 0 ? 'text-emerald-600 font-extrabold' : 'text-blue-600'}>
+                          {totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0}%
+                        </span>
+                      </div>
+                      {/* Progress bar */}
+                      <div className="w-full h-2 bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-500 transition-all duration-300 rounded-full"
+                          style={{ width: `${totalCount > 0 ? (doneCount / totalCount) * 100 : 0}%` }}
+                        />
+                      </div>
+                      {/* Todos list */}
+                      <div className="space-y-2 pt-1">
+                        {todos.map((todo: any, tIdx: number) => (
+                          <div
+                            key={tIdx}
+                            className={`p-3 rounded-xl border flex items-start gap-2.5 text-xs transition-all ${
+                              todo.done
+                                ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40 text-emerald-900 dark:text-emerald-300'
+                                : 'bg-gray-50/50 dark:bg-slate-950 border-gray-200 dark:border-slate-800 text-gray-800 dark:text-slate-200'
+                            }`}
+                          >
+                            {todo.done ? (
+                              <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+                            ) : (
+                              <Circle size={16} className="text-gray-400 shrink-0 mt-0.5" />
+                            )}
+                            <span className={todo.done ? 'line-through opacity-80 font-medium' : 'font-semibold'}>
+                              {todo.text}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Nội dung ghi chú</span>
+                      <div className="p-4 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-2xl text-xs leading-relaxed text-gray-800 dark:text-slate-200 font-medium italic">
+                        "{title}"
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Attachments / Expense / Reactions Badges */}
+                  <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-100 dark:border-slate-800 text-xs">
+                    {/* Visited Status */}
+                    {selectedPlaceItem.isVisited && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 font-bold rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs">
+                        <CheckCircle2 size={14} className="text-emerald-600" /> Đã hoàn thành
+                      </span>
+                    )}
+
+                    {/* Attachments */}
+                    {attachments.length > 0 && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 font-bold rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs">
+                        <Paperclip size={14} className="text-indigo-600" /> Đính kèm ({attachments.length})
+                      </span>
+                    )}
+
+                    {/* Expense */}
+                    {selectedPlaceItem.expense && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-50 text-purple-700 font-extrabold rounded-xl border border-purple-200 text-xs">
+                        <span className="text-purple-600 font-bold">$</span>
+                        {selectedPlaceItem.expense.amount?.toLocaleString('vi-VN')} {selectedPlaceItem.expense.currencySymbol || selectedTripDetail?.currencySymbol || 'đ'}
+                      </span>
+                    )}
+
+                    {/* Reactions */}
+                    {reactions.length > 0 && (
+                      <div className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 rounded-xl border border-amber-200 text-xs">
+                        <Smile size={14} className="text-amber-500 shrink-0" />
+                        <span className="font-bold text-amber-700">{reactions.join(' ')}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="p-4 border-t border-gray-200 dark:border-slate-800 bg-gray-50/80 dark:bg-slate-950/80 flex justify-end">
+                  <button
+                    onClick={() => setIsPlaceDetailOpen(false)}
+                    className="px-4 py-2 border border-gray-200 dark:border-slate-800 text-xs font-bold rounded-xl text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-900 cursor-pointer"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        // RENDER STANDARD PLACE DETAIL MODAL IF IT IS A PLACE
+        return (
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl border border-gray-200 dark:border-slate-800 flex flex-col max-h-[90vh] my-auto">
+              {/* Modal Banner Header */}
+              <div className="relative h-56 w-full bg-slate-900 overflow-hidden shrink-0">
+                {selectedPlaceItem.place?.image || selectedPlaceItem.place?.photos?.[0]?.urlOriginal ? (
+                  <img
+                    src={selectedPlaceItem.place?.image || selectedPlaceItem.place?.photos?.[0]?.urlOriginal}
+                    alt={selectedPlaceItem.place?.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-600 to-indigo-900 text-white font-bold text-lg">
+                    <MapPin size={48} className="opacity-40" />
+                  </div>
+                )}
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-transparent" />
+              
+              {/* Close Button */}
+              <button
+                onClick={() => setIsPlaceDetailOpen(false)}
+                className="absolute top-4 right-4 p-2.5 bg-black/40 hover:bg-black/60 text-white rounded-full transition-colors backdrop-blur-xs cursor-pointer z-10"
+              >
+                <X size={18} />
+              </button>
+
+              {/* Category & Tag Badges */}
+              <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
+                <div>
+                  {selectedPlaceItem.place?.category?.name && (
+                    <span className="px-2.5 py-1 bg-blue-600/90 text-white font-extrabold text-[11px] rounded-lg inline-block mb-1 shadow-sm backdrop-blur-xs">
+                      📍 {selectedPlaceItem.place.category.name}
+                    </span>
+                  )}
+                  <h3 className="text-xl font-extrabold text-white drop-shadow-md">
+                    {selectedPlaceItem.place?.name || (selectedPlaceItem.noteText ? selectedPlaceItem.noteText.replace(/^\[TODO\]\s*/i, '') : 'Chi tiết địa điểm')}
+                  </h3>
+                </div>
+                {selectedPlaceItem.place?.rating && (
+                  <div className="flex items-center gap-1 bg-amber-500 text-white font-extrabold text-xs px-2.5 py-1 rounded-lg shrink-0 shadow-sm">
+                    <Star size={14} className="fill-white" />
+                    <span>{selectedPlaceItem.place.rating}</span>
+                    {selectedPlaceItem.place.userRatingCount && (
+                      <span className="text-[10px] font-normal opacity-90">({selectedPlaceItem.place.userRatingCount})</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Body Scrollable Content */}
+            <div className="p-6 overflow-y-auto space-y-5 flex-1">
+              {/* Thông tin do người dùng lưu trong hành trình */}
+              <div className="p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 space-y-3">
+                <h4 className="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles size={14} /> Thông tin lưu trong chuyến đi
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {selectedPlaceItem.section && (
+                    <div>
+                      <span className="text-gray-500 dark:text-slate-400">Mục (Section): </span>
+                      <strong className="text-gray-800 dark:text-slate-200">{selectedPlaceItem.section}</strong>
+                    </div>
+                  )}
+                  {selectedPlaceItem.day && (
+                    <div>
+                      <span className="text-gray-500 dark:text-slate-400">Lịch trình: </span>
+                      <strong className="text-gray-800 dark:text-slate-200">Ngày {selectedPlaceItem.day}</strong>
+                    </div>
+                  )}
+                </div>
+
+                {/* Custom note by user */}
+                {selectedPlaceItem.noteText && selectedPlaceItem.noteText !== selectedPlaceItem.place?.name && (
+                  <div className="text-xs">
+                    <span className="text-gray-500 dark:text-slate-400 block mb-0.5 font-semibold">Ghi chú riêng của bạn:</span>
+                    <p className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-blue-100 dark:border-blue-900/30 text-gray-800 dark:text-slate-200 italic font-medium">
+                      "{selectedPlaceItem.noteText.replace(/^\[TODO\]\s*/i, '')}"
+                    </p>
+                  </div>
+                )}
+
+                {/* Action / Specs Badges Row (User custom info matching item card bar) */}
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-blue-100 dark:border-blue-900/40 text-xs">
+                  {/* Ghé thăm */}
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 font-bold rounded-xl border transition-colors ${
+                      selectedPlaceItem.isVisited
+                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/60 shadow-2xs'
+                        : 'bg-white dark:bg-slate-900 text-gray-400 dark:text-slate-500 border-gray-200 dark:border-slate-800'
+                    }`}
+                  >
+                    <CheckCircle2 size={14} className={selectedPlaceItem.isVisited ? 'text-emerald-600' : 'opacity-40'} />
+                    {selectedPlaceItem.isVisited ? 'Đã ghé thăm' : 'Đánh dấu ghé thăm'}
+                  </span>
+
+                  {/* Giờ */}
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 font-bold rounded-xl border transition-colors ${
+                      selectedPlaceItem.startTime || selectedPlaceItem.endTime
+                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-900/60 shadow-2xs'
+                        : 'bg-white dark:bg-slate-900 text-gray-400 dark:text-slate-500 border-gray-200 dark:border-slate-800'
+                    }`}
+                  >
+                    <Clock size={14} className={selectedPlaceItem.startTime || selectedPlaceItem.endTime ? 'text-blue-600' : 'opacity-40'} />
+                    {selectedPlaceItem.startTime || selectedPlaceItem.endTime
+                      ? `${selectedPlaceItem.startTime || '00:00'} - ${selectedPlaceItem.endTime || '00:00'}`
+                      : 'Thêm giờ'}
+                  </span>
+
+                  {/* Đính kèm */}
+                  {(() => {
+                    const atts = parseJsonArray(selectedPlaceItem.attachments);
+                    return (
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 font-bold rounded-xl border transition-colors ${
+                          atts.length > 0
+                            ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-900/60 shadow-2xs'
+                            : 'bg-white dark:bg-slate-900 text-gray-400 dark:text-slate-500 border-gray-200 dark:border-slate-800'
+                        }`}
+                      >
+                        <Paperclip size={14} className={atts.length > 0 ? 'text-indigo-600' : 'opacity-40'} />
+                        {atts.length > 0 ? `Đính kèm (${atts.length})` : 'Đính kèm'}
+                      </span>
+                    );
+                  })()}
+
+                  {/* Chi phí do người dùng thêm */}
+                  {selectedPlaceItem.expense && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-extrabold rounded-xl border border-purple-200 dark:border-purple-900/60 shadow-2xs">
+                      <span className="text-purple-600 font-bold">$</span>
+                      {selectedPlaceItem.expense.amount?.toLocaleString('vi-VN')} {selectedPlaceItem.expense.currencySymbol || selectedTripDetail?.currencySymbol || 'đ'}
+                    </span>
+                  )}
+
+                  {/* Cảm xúc / Reactions / Emojis */}
+                  {(() => {
+                    const reactArr = parseJsonArray(selectedPlaceItem.reactions);
+                    if (reactArr.length === 0) return null;
+                    return (
+                      <div className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 dark:bg-amber-950/50 rounded-xl border border-amber-200 dark:border-amber-900/40 text-xs">
+                        <Smile size={14} className="text-amber-500 shrink-0" />
+                        <span className="font-bold text-amber-700 dark:text-amber-300">{reactArr.join(' ')}</span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Thông tin chi tiết địa điểm */}
+              {selectedPlaceItem.place && (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Thông tin địa điểm</h4>
+                  <div className="space-y-2.5 text-xs">
+                    {selectedPlaceItem.place.address && (
+                      <div className="flex items-start gap-2.5 text-gray-700 dark:text-slate-300">
+                        <MapPin size={16} className="text-blue-500 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-semibold block">Địa chỉ:</span>
+                          <span>{formatAddress(selectedPlaceItem.place.address)}</span>
+                        </div>
+                      </div>
+                    )}
+                    {selectedPlaceItem.place.price && (
+                      <div className="flex items-center gap-2.5 text-gray-700 dark:text-slate-300">
+                        <DollarSign size={16} className="text-emerald-500 shrink-0" />
+                        <span>Mức giá: <strong>{selectedPlaceItem.place.price}</strong> {selectedPlaceItem.place.priceLevel && `(${selectedPlaceItem.place.priceLevel})`}</span>
+                      </div>
+                    )}
+                    {selectedPlaceItem.place.phone && (
+                      <div className="flex items-center gap-2.5 text-gray-700 dark:text-slate-300">
+                        <Phone size={16} className="text-indigo-500 shrink-0" />
+                        <span>Điện thoại: <strong>{selectedPlaceItem.place.phone}</strong></span>
+                      </div>
+                    )}
+                    {selectedPlaceItem.place.website && (
+                      <div className="flex items-center gap-2.5 text-gray-700 dark:text-slate-300">
+                        <Globe size={16} className="text-sky-500 shrink-0" />
+                        <span>Website: </span>
+                        <a href={selectedPlaceItem.place.website} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline flex items-center gap-1 font-semibold truncate max-w-xs">
+                          {selectedPlaceItem.place.website} <ExternalLink size={12} />
+                        </a>
+                      </div>
+                    )}
+                    {(selectedPlaceItem.place.tripadvisorUrl || selectedPlaceItem.place.tripadvisor_url) && (
+                      <div className="flex items-center gap-2.5 text-gray-700 dark:text-slate-300">
+                        <Compass size={16} className="text-emerald-500 shrink-0" />
+                        <span>TripAdvisor: </span>
+                        <a
+                          href={selectedPlaceItem.place.tripadvisorUrl || selectedPlaceItem.place.tripadvisor_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-semibold truncate max-w-xs"
+                        >
+                          Xem chi tiết trên TripAdvisor <ExternalLink size={12} />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Mô tả địa điểm */}
+              {selectedPlaceItem.place?.description && (
+                <div className="space-y-1.5">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Giới thiệu</h4>
+                  <p className="text-xs text-gray-600 dark:text-slate-300 leading-relaxed bg-gray-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-gray-200 dark:border-slate-800">
+                    {selectedPlaceItem.place.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Bộ sưu tập ảnh địa điểm (Photo gallery) */}
+              {selectedPlaceItem.place?.photos && selectedPlaceItem.place.photos.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Hình ảnh ({selectedPlaceItem.place.photos.length})</h4>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {selectedPlaceItem.place.photos.map((photo: any, pIdx: number) => (
+                      <div key={pIdx} className="h-20 rounded-xl overflow-hidden bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-800">
+                        <img src={photo.urlThumbnail || photo.urlOriginal} alt="Photo" className="w-full h-full object-cover hover:scale-105 transition-transform cursor-pointer" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Danh sách Đánh giá (Reviews) */}
+              {selectedPlaceItem.place && (
+                <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <Star size={14} className="text-amber-500 fill-amber-500" />
+                      Đánh giá ({selectedPlaceItem.place.reviews?.length || selectedPlaceItem.place.userRatingCount || 0})
+                    </h4>
+                    {selectedPlaceItem.place.rating && (
+                      <span className="text-xs font-extrabold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2.5 py-0.5 rounded-lg border border-amber-200 dark:border-amber-900/60 flex items-center gap-1">
+                        <Star size={12} className="fill-amber-500" /> {selectedPlaceItem.place.rating} / 5.0
+                      </span>
+                    )}
+                  </div>
+
+                  {selectedPlaceItem.place.reviews && selectedPlaceItem.place.reviews.length > 0 ? (
+                    <div className="space-y-3">
+                      {selectedPlaceItem.place.reviews.map((rev: any, rIdx: number) => {
+                        const authorName = rev.authorName || rev.user?.fullName || 'Người dùng CloudMood';
+                        const authorAvatar = rev.authorAvatar || rev.user?.avatar || '/default-avatar.jpg';
+                        const revDate = rev.publishedDate ? new Date(rev.publishedDate).toLocaleDateString('vi-VN') : null;
+                        const ratingVal = Number(rev.rating) || 5;
+
+                        return (
+                          <div
+                            key={rev.id || rIdx}
+                            className="p-3.5 rounded-2xl bg-gray-50/80 dark:bg-slate-950/80 border border-gray-200 dark:border-slate-800/80 space-y-2"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 overflow-hidden shrink-0 border border-gray-200 dark:border-slate-800">
+                                  <img src={authorAvatar} alt={authorName} className="w-full h-full object-cover" />
+                                </div>
+                                <div>
+                                  <span className="font-bold text-xs text-gray-900 dark:text-slate-100 block">
+                                    {authorName}
+                                  </span>
+                                  {revDate && (
+                                    <span className="text-[10px] text-gray-400 block">{revDate}</span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-0.5">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <Star
+                                    key={star}
+                                    size={12}
+                                    className={star <= ratingVal ? 'text-amber-500 fill-amber-500' : 'text-gray-300 dark:text-slate-700'}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                            {rev.comment && (
+                              <p className="text-xs text-gray-700 dark:text-slate-300 leading-relaxed font-normal pl-1">
+                                "{rev.comment}"
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-2xl bg-gray-50 dark:bg-slate-950 text-center border border-gray-200 dark:border-slate-800">
+                      <p className="text-xs text-gray-400 italic">Chưa có bài đánh giá chi tiết nào từ cộng đồng cho địa điểm này.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-gray-200 dark:border-slate-800 bg-gray-50/80 dark:bg-slate-950/80 flex items-center justify-between shrink-0">
+              <button
+                onClick={() => setIsPlaceDetailOpen(false)}
+                className="px-4 py-2.5 border border-gray-200 dark:border-slate-800 text-xs font-bold rounded-xl text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-900 transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+              <div className="flex items-center gap-2">
+                {(selectedPlaceItem.place?.tripadvisorUrl || selectedPlaceItem.place?.tripadvisor_url) && (
+                  <a
+                    href={selectedPlaceItem.place.tripadvisorUrl || selectedPlaceItem.place.tripadvisor_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                  >
+                    <Compass size={14} /> TripAdvisor <ExternalLink size={12} />
+                  </a>
+                )}
+                {selectedPlaceItem.place?.name && (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((selectedPlaceItem.place.name || '') + ' ' + (selectedPlaceItem.place.address || ''))}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                  >
+                    <MapPin size={14} /> Xem trên Google Maps <ExternalLink size={12} />
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    })()}
+
     </div>
   );
 }
