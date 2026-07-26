@@ -1096,7 +1096,7 @@ export default function ItinerariesPage() {
               <span className="text-2xl font-extrabold block mt-1">{trips.length.toLocaleString()}</span>
             </div>
             <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-4 text-white shadow-xs">
-              <span className="text-xs font-semibold uppercase text-blue-100 block">AI tự ren</span>
+              <span className="text-xs font-semibold uppercase text-blue-100 block">AI tạo</span>
               <span className="text-2xl font-extrabold block mt-1">
                 {trips.filter(t => t.isAi === true).length.toLocaleString()}
               </span>
@@ -1146,7 +1146,7 @@ export default function ItinerariesPage() {
                   onClick={() => setTripsFilter('ai')}
                   className={`px-3 py-1 rounded-lg text-xs font-bold ${tripsFilter === 'ai' ? 'bg-blue-600 text-white shadow-xs' : 'text-gray-500'}`}
                 >
-                  AI tự ren
+                  AI tạo
                 </button>
               </div>
             </div>
@@ -1214,7 +1214,7 @@ export default function ItinerariesPage() {
                           <div className="flex flex-col gap-1 items-start">
                             {t.isAi ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700">
-                                <Sparkles size={12} /> AI tự ren
+                                <Sparkles size={12} /> AI tạo
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700">
@@ -1480,7 +1480,7 @@ export default function ItinerariesPage() {
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-blue-600 text-white">
-                          {selectedTripDetail.isAi ? '⚡ AI tự ren' : '✍️ Tự tạo'}
+                          {selectedTripDetail.isAi ? '⚡ AI tạo' : '✍️ Tự tạo'}
                         </span>
                         {(() => {
                           const priv = getPrivacyBadgeInfo(null, selectedTripDetail);

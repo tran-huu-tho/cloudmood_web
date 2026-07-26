@@ -36,6 +36,7 @@ export type Place = {
   subCategories?: string[] | null;
   openingHours?: any | null;
   lastSyncedAt: string | null;
+  _count?: { reviews: number } | null;
 };
 
 export type Review = {

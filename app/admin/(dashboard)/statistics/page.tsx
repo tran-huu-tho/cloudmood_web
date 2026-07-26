@@ -14,6 +14,7 @@ export default function StatisticsPage() {
   const [places, setPlaces] = useState<Place[]>([]);
   const [itineraries, setItineraries] = useState<Itinerary[]>([]);
   const [totalReviews, setTotalReviews] = useState(0);
+  const [avgReviewRating, setAvgReviewRating] = useState<number | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
@@ -45,6 +46,9 @@ export default function StatisticsPage() {
 
       setTotalUsers(statsRes.stats?.userCount || 0);
       setTotalReviews(statsRes.stats?.reviewCount || 0);
+      if (statsRes.stats?.avgReviewRating !== undefined) {
+        setAvgReviewRating(statsRes.stats.avgReviewRating);
+      }
       setPlaces(placesRes.places || []);
       setItineraries(itinerariesRes || []);
       setCategories(categoriesRes || []);
@@ -76,9 +80,11 @@ export default function StatisticsPage() {
   }
 
   // Calculate statistics in-memory
-  const avgRating = places.length > 0
-    ? (places.reduce((acc, curr) => acc + (curr.rating || 0), 0) / places.length).toFixed(1)
-    : '0.0';
+  const avgRating = avgReviewRating !== null
+    ? avgReviewRating.toFixed(1)
+    : places.length > 0
+      ? (places.reduce((acc, curr) => acc + (curr.rating || 0), 0) / places.length).toFixed(1)
+      : '0.0';
 
   // Places by Category distribution
   const categoryCounts = categories.map((cat) => {
@@ -87,10 +93,15 @@ export default function StatisticsPage() {
     return { name: cat.name || 'N/A', count, percentage };
   }).sort((a, b) => b.count - a.count);
 
-  // Top rated places (Filter for high quality places rating >= 4.5, then sort by review count/popularity descending)
+  // Top rated places (Sorted by in-app review count and rating)
   const topPlaces = [...places]
-    .filter((p) => p.rating !== null && p.rating >= 4.5)
-    .sort((a, b) => (b.userRatingCount || 0) - (a.userRatingCount || 0))
+    .filter((p) => p.rating !== null && p.rating >= 4.0)
+    .sort((a, b) => {
+      const aCount = a._count?.reviews || 0;
+      const bCount = b._count?.reviews || 0;
+      if (bCount !== aCount) return bCount - aCount;
+      return (b.rating || 0) - (a.rating || 0);
+    })
     .slice(0, 5);
 
   // Recent Itineraries
@@ -238,7 +249,7 @@ export default function StatisticsPage() {
                     <div className="flex items-center gap-1.5 shrink-0">
                       <Star size={14} fill="#fbbf24" className="text-amber-400" />
                       <span className="font-bold text-sm text-gray-900 font-mono">{(place.rating || 0).toFixed(1)}</span>
-                      <span className="text-gray-400 text-xs">({place.userRatingCount || 0} vote)</span>
+                      <span className="text-gray-400 text-xs">({place._count?.reviews || 0} đánh giá)</span>
                     </div>
                   </div>
                 ))}

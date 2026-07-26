@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useTransition, startTransition } from 'react';
 import dynamic from 'next/dynamic';
 import { Place, Category } from '@/lib/supabase/types';
-import { Plus, Edit2, Trash2, Search, X, Loader2, MapPin, ExternalLink, Check, Upload, Star, MessageSquare, Calendar, Clock, Image as ImageIcon, Info } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, X, Loader2, MapPin, ExternalLink, Check, Upload, Star, MessageSquare, Calendar, Clock, Image as ImageIcon, Info, ArrowRight, ArrowLeft } from 'lucide-react';
 import { cleanAddress, formatPrice } from '@/lib/utils';
 import { getCategoryIcon } from '../categories/page';
 
@@ -156,6 +156,7 @@ export default function LocationsPage() {
 
   // Tabs State (For Edit Modal)
   const [activeTab, setActiveTab] = useState<'general' | 'reviews' | 'photos'>('general');
+  const [formSubTab, setFormSubTab] = useState<'basic' | 'extra'>('basic');
   const [placeReviews, setPlaceReviews] = useState<any[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [placePhotos, setPlacePhotos] = useState<any[]>([]);
@@ -255,6 +256,7 @@ export default function LocationsPage() {
     });
     setModalType('create');
     setActiveTab('general');
+    setFormSubTab('basic');
     setModalError(null);
     setIsModalOpen(true);
   };
@@ -297,6 +299,7 @@ export default function LocationsPage() {
     });
     setModalType('edit');
     setActiveTab('general');
+    setFormSubTab('basic');
     setModalError(null);
     setIsModalOpen(true);
     
@@ -1234,377 +1237,465 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
               </button>
             </div>
 
-            {/* Tab 1: General Info */}
+            {/* Tab 1: General Info (Split into 2 Sub-Tabs) */}
             {(activeTab === 'general' || modalType === 'create') && (
-              <form onSubmit={handleSave} className="p-4 space-y-2.5 max-h-[94vh] overflow-y-auto">
+              <form onSubmit={handleSave} className="p-5 space-y-4 max-h-[85vh] overflow-y-auto">
                 {modalError && (
                   <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{modalError}</div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
-                  {/* Column 1: Name, Category, Description, Address, Subcategories & Hours */}
-                  <div className="space-y-3 flex flex-col h-full">
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700 block">
-                        Tên địa điểm <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Nhập tên địa điểm..."
-                        value={currentPlace.name || ''}
-                        onChange={(e) => setCurrentPlace({ ...currentPlace, name: e.target.value })}
-                        disabled={modalLoading}
-                        className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-1.5 bg-white focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
+                {/* Sub-Tabs Switcher Bar */}
+                <div className="flex border-b border-gray-200 bg-gray-50/70 rounded-t-xl px-4 pt-2 -mx-5 -mt-5 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => setFormSubTab('basic')}
+                    className={`flex items-center gap-2 px-5 py-3 text-xs font-bold rounded-t-xl transition-all cursor-pointer border-t border-x ${
+                      formSubTab === 'basic'
+                        ? 'bg-white border-gray-250 text-blue-600 shadow-2xs -mb-px'
+                        : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-100/60'
+                    }`}
+                  >
+                    <Info size={16} />
+                    1. Thông tin cơ bản & Vị trí
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormSubTab('extra')}
+                    className={`flex items-center gap-2 px-5 py-3 text-xs font-bold rounded-t-xl transition-all cursor-pointer border-t border-x ${
+                      formSubTab === 'extra'
+                        ? 'bg-white border-gray-250 text-blue-600 shadow-2xs -mb-px'
+                        : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-100/60'
+                    }`}
+                  >
+                    <ImageIcon size={16} />
+                    2. Hình ảnh, Danh mục phụ & Giờ hoạt động
+                  </button>
+                </div>
 
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700 block">
-                        Danh mục <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={currentPlace.categoryId || ''}
-                        onChange={(e) => setCurrentPlace({ ...currentPlace, categoryId: Number(e.target.value) })}
-                        disabled={modalLoading}
-                        className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
-                      >
-                        <option value="" disabled>Select category</option>
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                {/* Equal Height Sub-Tabs Container */}
+                <div className="min-h-[585px]">
+                  {/* SUB-TAB 1: Basic Info & Map */}
+                  {formSubTab === 'basic' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                      {/* Left Column: Essential Fields */}
+                      <div className="space-y-4">
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-semibold text-gray-700 block">
+                            Tên địa điểm <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Nhập tên địa điểm..."
+                            value={currentPlace.name || ''}
+                            onChange={(e) => setCurrentPlace({ ...currentPlace, name: e.target.value })}
+                            disabled={modalLoading}
+                            className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-2 bg-white focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
 
-                    <div className="flex items-center gap-2 py-1">
-                      <input
-                        type="checkbox"
-                        id="isApprovedCheckbox"
-                        checked={currentPlace.isApproved === true || currentPlace.isApproved == null}
-                        onChange={(e) => setCurrentPlace({ ...currentPlace, isApproved: e.target.checked })}
-                        disabled={modalLoading}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                      />
-                      <label htmlFor="isApprovedCheckbox" className="text-sm font-semibold text-gray-700 cursor-pointer select-none">
-                        Đã phê duyệt (Hiển thị cho người dùng)
-                      </label>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700 block">Mô tả ngắn</label>
-                      <textarea
-                        placeholder="Nhập mô tả địa điểm..."
-                        value={currentPlace.description || ''}
-                        onChange={(e) => setCurrentPlace({ ...currentPlace, description: e.target.value })}
-                        disabled={modalLoading}
-                        rows={2}
-                        className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-1.5 bg-white focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700 block">
-                        Địa chỉ <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Nhập số nhà, tên đường, quận huyện..."
-                        value={currentPlace.address || ''}
-                        onChange={(e) => setCurrentPlace({ ...currentPlace, address: e.target.value })}
-                        disabled={modalLoading}
-                        className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-1.5 bg-white focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
-
-                    {/* Subcategories (Danh mục phụ) */}
-                    <div className="space-y-2 bg-gray-50/50 p-3 rounded-xl border border-gray-200">
-                      <label className="text-sm font-bold text-gray-700 block">Danh mục phụ</label>
-                      <div className="flex flex-wrap gap-1.5 mb-2">
-                        {(currentPlace.subCategories || []).map((sub: string) => (
-                          <span key={sub} className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs px-2.5 py-1 rounded-full border border-blue-200">
-                            {sub}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const updated = (currentPlace.subCategories || []).filter((s: string) => s !== sub);
-                                setCurrentPlace({ ...currentPlace, subCategories: updated });
-                              }}
-                              className="text-blue-500 hover:text-blue-700 font-bold shrink-0 cursor-pointer text-xs"
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-sm font-semibold text-gray-700 block">
+                              Danh mục <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                              value={currentPlace.categoryId || ''}
+                              onChange={(e) => setCurrentPlace({ ...currentPlace, categoryId: Number(e.target.value) })}
+                              disabled={modalLoading}
+                              className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
                             >
-                              &times;
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-
-                      {allSubCategories.filter(s => !(currentPlace.subCategories || []).includes(s)).length > 0 && (
-                        <div className="space-y-1 mb-2">
-                          <span className="text-[11px] font-semibold text-gray-400 block">Gợi ý từ dữ liệu:</span>
-                          <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
-                            {allSubCategories
-                              .filter(s => !(currentPlace.subCategories || []).includes(s))
-                              .map((sub: string) => (
-                                <button
-                                  key={sub}
-                                  type="button"
-                                  onClick={() => {
-                                    const updated = [...(currentPlace.subCategories || []), sub];
-                                    setCurrentPlace({ ...currentPlace, subCategories: updated });
-                                  }}
-                                  className="text-[10px] bg-white hover:bg-gray-100 text-gray-600 px-2 py-0.5 rounded-md border border-gray-200 transition-colors cursor-pointer"
-                                >
-                                  + {sub}
-                                </button>
+                              <option value="" disabled>Select category</option>
+                              {categories.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
                               ))}
+                            </select>
+                          </div>
+
+                          <div className="space-y-1.5 sm:pt-7">
+                            <label className="flex items-center gap-2 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                id="isApprovedCheckbox"
+                                checked={currentPlace.isApproved === true || currentPlace.isApproved == null}
+                                onChange={(e) => setCurrentPlace({ ...currentPlace, isApproved: e.target.checked })}
+                                disabled={modalLoading}
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                              />
+                              <span className="text-xs font-semibold text-gray-700">
+                                Đã phê duyệt (Hiển thị công khai)
+                              </span>
+                            </label>
                           </div>
                         </div>
-                      )}
 
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          placeholder="Nhập danh mục phụ mới..."
-                          value={currentPlace.subCategoriesInput || ''}
-                          onChange={(e) => setCurrentPlace({ ...currentPlace, subCategoriesInput: e.target.value })}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              const val = currentPlace.subCategoriesInput?.trim();
-                              if (val && !(currentPlace.subCategories || []).includes(val)) {
-                                setCurrentPlace({
-                                  ...currentPlace,
-                                  subCategories: [...(currentPlace.subCategories || []), val],
-                                  subCategoriesInput: ''
-                                });
-                              }
-                            }
-                          }}
-                          disabled={modalLoading}
-                          className="flex-1 text-xs text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:border-blue-500"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const val = currentPlace.subCategoriesInput?.trim();
-                            if (val && !(currentPlace.subCategories || []).includes(val)) {
-                              setCurrentPlace({
-                                ...currentPlace,
-                                subCategories: [...(currentPlace.subCategories || []), val],
-                                subCategoriesInput: ''
-                              });
-                            }
-                          }}
-                          className="px-3 py-1.5 bg-gray-150 hover:bg-gray-250 text-gray-705 text-xs font-semibold rounded-lg transition-colors border border-gray-300 cursor-pointer"
-                        >
-                          Thêm
-                        </button>
-                      </div>
-                    </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-semibold text-gray-700 block">Mô tả ngắn</label>
+                          <textarea
+                            placeholder="Nhập mô tả địa điểm..."
+                            value={currentPlace.description || ''}
+                            onChange={(e) => setCurrentPlace({ ...currentPlace, description: e.target.value })}
+                            disabled={modalLoading}
+                            rows={2}
+                            className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-2 bg-white focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
 
-                    {/* Opening Hours per day */}
-                    <div className="space-y-3 bg-gray-50/50 p-3 rounded-xl border border-gray-200">
-                      <label className="text-sm font-bold text-gray-700 block flex items-center gap-1.5">
-                        <Clock size={16} className="text-gray-500" />
-                        Giờ hoạt động chi tiết từng ngày
-                      </label>
-                      <div className="space-y-2.5 max-w-lg">
-                        {[
-                          { key: 'monday', label: 'Thứ 2' },
-                          { key: 'tuesday', label: 'Thứ 3' },
-                          { key: 'wednesday', label: 'Thứ 4' },
-                          { key: 'thursday', label: 'Thứ 5' },
-                          { key: 'friday', label: 'Thứ 6' },
-                          { key: 'saturday', label: 'Thứ 7' },
-                          { key: 'sunday', label: 'Chủ nhật' },
-                        ].map((day) => {
-                          const dayHours = currentPlace.openingHours?.[day.key];
-                          const isOpen = Array.isArray(dayHours) && dayHours.length >= 2;
-                          const openTime = isOpen ? dayHours[0] : '08:00';
-                          const closeTime = isOpen ? dayHours[1] : '21:00';
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-semibold text-gray-700 block">
+                            Địa chỉ <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Nhập số nhà, tên đường, quận huyện..."
+                            value={currentPlace.address || ''}
+                            onChange={(e) => setCurrentPlace({ ...currentPlace, address: e.target.value })}
+                            disabled={modalLoading}
+                            className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-2 bg-white focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
 
-                          return (
-                            <div key={day.key} className="flex items-center gap-4 text-xs border-b border-gray-100/50 pb-2 last:border-0 last:pb-0">
-                              <span className="font-semibold text-gray-700 w-16 shrink-0">{day.label}</span>
-                              
-                              <label className="flex items-center cursor-pointer select-none shrink-0 w-8">
-                                <input
-                                  type="checkbox"
-                                  checked={isOpen}
-                                  onChange={(e) => {
-                                    const checked = e.target.checked;
-                                    const updatedHours = { ...(currentPlace.openingHours || {}) };
-                                    if (checked) {
-                                      updatedHours[day.key] = ['08:00', '21:00'];
-                                    } else {
-                                      updatedHours[day.key] = null;
-                                    }
-                                    setCurrentPlace({ ...currentPlace, openingHours: updatedHours });
-                                  }}
-                                  className="w-3.5 h-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                                />
-                              </label>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-sm font-semibold text-gray-700 block">Mức giá</label>
+                            <select
+                              value={currentPlace.priceLevel || 'MODERATE'}
+                              onChange={(e) => setCurrentPlace({ ...currentPlace, priceLevel: e.target.value })}
+                              disabled={modalLoading}
+                              className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
+                            >
+                              <option value="FREE">Miễn phí</option>
+                              <option value="CHEAP">Giá rẻ</option>
+                              <option value="MODERATE">Trung bình</option>
+                              <option value="EXPENSIVE">Cao cấp</option>
+                              <option value="VERY_EXP">Rất cao cấp</option>
+                            </select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-sm font-semibold text-gray-700 block">Số điện thoại</label>
+                            <input
+                              type="text"
+                              placeholder="VD: 0292 3890..."
+                              value={currentPlace.phone || ''}
+                              onChange={(e) => setCurrentPlace({ ...currentPlace, phone: e.target.value })}
+                              disabled={modalLoading}
+                              className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-2 bg-white focus:outline-none focus:border-blue-500"
+                            />
+                          </div>
+                        </div>
 
-                              <div className="flex items-center gap-2 shrink-0">
-                                <input
-                                  type="time"
-                                  value={openTime}
-                                  disabled={!isOpen || modalLoading}
-                                  onChange={(e) => {
-                                    const updatedHours = { ...(currentPlace.openingHours || {}) };
-                                    updatedHours[day.key] = [e.target.value, closeTime];
-                                    setCurrentPlace({ ...currentPlace, openingHours: updatedHours });
-                                  }}
-                                  className="text-[11.5px] text-gray-900 border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white disabled:bg-gray-100 disabled:text-gray-400 focus:outline-none focus:border-blue-500 w-[124px] text-center"
-                                />
-                                <span className="text-gray-450 text-[10px]">&ndash;</span>
-                                <input
-                                  type="time"
-                                  value={closeTime}
-                                  disabled={!isOpen || modalLoading}
-                                  onChange={(e) => {
-                                    const updatedHours = { ...(currentPlace.openingHours || {}) };
-                                    updatedHours[day.key] = [openTime, e.target.value];
-                                    setCurrentPlace({ ...currentPlace, openingHours: updatedHours });
-                                  }}
-                                  className="text-[11.5px] text-gray-900 border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white disabled:bg-gray-100 disabled:text-gray-400 focus:outline-none focus:border-blue-500 w-[124px] text-center"
-                                />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Column 2: Coordinates, Details & Map */}
-                  <div className="space-y-3 flex flex-col h-full">
-                    <div className="grid grid-cols-2 gap-3 shrink-0">
-                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-gray-700 block">Vĩ độ (Latitude)</label>
-                        <input
-                          type="number"
-                          step="any"
-                          value={currentPlace.latitude || ''}
-                          onChange={(e) => setCurrentPlace({ ...currentPlace, latitude: parseFloat(e.target.value) || 0 })}
-                          disabled={modalLoading}
-                          className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-1.5 bg-white focus:outline-none focus:border-blue-500"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-gray-700 block">Kinh độ (Longitude)</label>
-                        <input
-                          type="number"
-                          step="any"
-                          value={currentPlace.longitude || ''}
-                          onChange={(e) => setCurrentPlace({ ...currentPlace, longitude: parseFloat(e.target.value) || 0 })}
-                          disabled={modalLoading}
-                          className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-1.5 bg-white focus:outline-none focus:border-blue-500"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 shrink-0">
-                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-gray-700 block">Số điện thoại</label>
-                        <input
-                          type="text"
-                          placeholder="VD: 0292 3890..."
-                          value={currentPlace.phone || ''}
-                          onChange={(e) => setCurrentPlace({ ...currentPlace, phone: e.target.value })}
-                          disabled={modalLoading}
-                          className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-1.5 bg-white focus:outline-none focus:border-blue-500"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-gray-700 block">Trang web</label>
-                        <input
-                          type="text"
-                          placeholder="VD: https://cloudmood.com..."
-                          value={currentPlace.website || ''}
-                          onChange={(e) => setCurrentPlace({ ...currentPlace, website: e.target.value })}
-                          disabled={modalLoading}
-                          className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-1.5 bg-white focus:outline-none focus:border-blue-500"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 shrink-0">
-                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-gray-700 block">Mức giá</label>
-                        <select
-                          value={currentPlace.priceLevel || 'MODERATE'}
-                          onChange={(e) => setCurrentPlace({ ...currentPlace, priceLevel: e.target.value })}
-                          disabled={modalLoading}
-                          className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
-                        >
-                          <option value="FREE">Miễn phí</option>
-                          <option value="CHEAP">Giá rẻ</option>
-                          <option value="MODERATE">Trung bình</option>
-                          <option value="EXPENSIVE">Cao cấp</option>
-                          <option value="VERY_EXP">Rất cao cấp</option>
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-gray-700 block">Ảnh minh họa (Link)</label>
-                        <input
-                          type="text"
-                          placeholder="Link hình ảnh..."
-                          value={currentPlace.image || ''}
-                          onChange={(e) => setCurrentPlace({ ...currentPlace, image: e.target.value })}
-                          disabled={modalLoading}
-                          className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-1.5 bg-white focus:outline-none focus:border-blue-500"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Image Preview Box */}
-                    {currentPlace.image && (
-                      <div className="space-y-1.5 shrink-0">
-                        <span className="text-[11px] font-semibold text-gray-500 block">Xem trước ảnh minh họa:</span>
-                        <div className="relative w-full h-16 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center group">
-                          <img 
-                            src={currentPlace.image} 
-                            alt="Xem trước địa điểm" 
-                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = 'none';
-                            }}
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-semibold text-gray-700 block">Trang web</label>
+                          <input
+                            type="text"
+                            placeholder="VD: https://cloudmood.com..."
+                            value={currentPlace.website || ''}
+                            onChange={(e) => setCurrentPlace({ ...currentPlace, website: e.target.value })}
+                            disabled={modalLoading}
+                            className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-2 bg-white focus:outline-none focus:border-blue-500"
                           />
                         </div>
                       </div>
-                    )}
 
-                    <div className="space-y-2 flex-1 flex flex-col min-h-[300px]">
-                      <label className="text-sm font-semibold text-gray-700 block">Chọn vị trí trên bản đồ</label>
-                      <div className="w-full flex-grow flex-1 h-0">
-                        <MapPicker
-                          lat={Number(currentPlace.latitude) || 10.03022}
-                          lng={Number(currentPlace.longitude) || 105.78753}
-                          onChange={handleCoordinateChange}
-                        />
+                      {/* Right Column: Coordinates & MapPicker */}
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-sm font-semibold text-gray-700 block">Vĩ độ (Latitude)</label>
+                            <input
+                              type="number"
+                              step="any"
+                              value={currentPlace.latitude || ''}
+                              onChange={(e) => setCurrentPlace({ ...currentPlace, latitude: parseFloat(e.target.value) || 0 })}
+                              disabled={modalLoading}
+                              className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-2 bg-white focus:outline-none focus:border-blue-500"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-sm font-semibold text-gray-700 block">Kinh độ (Longitude)</label>
+                            <input
+                              type="number"
+                              step="any"
+                              value={currentPlace.longitude || ''}
+                              onChange={(e) => setCurrentPlace({ ...currentPlace, longitude: parseFloat(e.target.value) || 0 })}
+                              disabled={modalLoading}
+                              className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-2 bg-white focus:outline-none focus:border-blue-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-semibold text-gray-700 flex items-center justify-between">
+                            <span>Chọn vị trí trên bản đồ</span>
+                            <span className="text-xs font-normal text-gray-400">Click trên bản đồ để chọn tọa độ</span>
+                          </label>
+                          <div className="w-full h-[465px] border border-gray-250 rounded-xl overflow-hidden shadow-2xs relative bg-gray-50">
+                            <MapPicker
+                              lat={Number(currentPlace.latitude) || 10.03022}
+                              lng={Number(currentPlace.longitude) || 105.78753}
+                              onChange={handleCoordinateChange}
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
+
+                  {/* SUB-TAB 2: Image, Subcategories & Hours */}
+                  {formSubTab === 'extra' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                      {/* Left Column: Image Preview & Subcategories */}
+                      <div className="space-y-4">
+                        {/* Image Link & Large Preview */}
+                        <div className="space-y-3 bg-gray-50/60 p-4 rounded-xl border border-gray-200">
+                          <div className="space-y-1.5">
+                            <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                              <ImageIcon size={16} className="text-blue-600" />
+                              Ảnh minh họa (Link URL)
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Nhập đường dẫn hình ảnh (https://...)"
+                              value={currentPlace.image || ''}
+                              onChange={(e) => setCurrentPlace({ ...currentPlace, image: e.target.value })}
+                              disabled={modalLoading}
+                              className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-2 bg-white focus:outline-none focus:border-blue-500"
+                            />
+                          </div>
+
+                          {/* Large Image Preview Box */}
+                          <div className="space-y-1.5">
+                            <span className="text-xs font-semibold text-gray-500 block">Xem trước ảnh minh họa:</span>
+                            <div className="relative w-full h-52 rounded-xl overflow-hidden border border-gray-200 bg-white flex items-center justify-center shadow-inner group">
+                              {currentPlace.image ? (
+                                <img 
+                                  src={currentPlace.image} 
+                                  alt="Xem trước địa điểm" 
+                                  className="max-h-full max-w-full object-contain p-2 transition-transform duration-300 group-hover:scale-105"
+                                  onError={(e) => {
+                                    (e.target as HTMLElement).style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <div className="flex flex-col items-center justify-center text-gray-400 p-4 text-center">
+                                  <ImageIcon size={36} className="mb-2 text-gray-300" />
+                                  <span className="text-xs font-medium">Chưa có ảnh minh họa</span>
+                                  <span className="text-[11px] text-gray-400 mt-0.5">Nhập link URL ở trên để xem trước tại đây</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Subcategories (Danh mục phụ) */}
+                        <div className="space-y-3 bg-gray-50/60 p-4 rounded-xl border border-gray-200">
+                          <label className="text-sm font-bold text-gray-800 block">Danh mục phụ</label>
+                          <div className="flex flex-wrap gap-1.5 min-h-[32px]">
+                            {(currentPlace.subCategories || []).length === 0 ? (
+                              <span className="text-xs text-gray-400 italic">Chưa chọn danh mục phụ nào</span>
+                            ) : (
+                              (currentPlace.subCategories || []).map((sub: string) => (
+                                <span key={sub} className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-medium px-2.5 py-1 rounded-full border border-blue-200">
+                                  {sub}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = (currentPlace.subCategories || []).filter((s: string) => s !== sub);
+                                      setCurrentPlace({ ...currentPlace, subCategories: updated });
+                                    }}
+                                    className="text-blue-500 hover:text-blue-800 font-bold shrink-0 cursor-pointer text-xs"
+                                  >
+                                    &times;
+                                  </button>
+                                </span>
+                              ))
+                            )}
+                          </div>
+
+                          {allSubCategories.filter(s => !(currentPlace.subCategories || []).includes(s)).length > 0 && (
+                            <div className="space-y-1 pt-1 border-t border-gray-200/60">
+                              <span className="text-[11px] font-semibold text-gray-400 block">Gợi ý từ hệ thống:</span>
+                              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
+                                {allSubCategories
+                                  .filter(s => !(currentPlace.subCategories || []).includes(s))
+                                  .map((sub: string) => (
+                                    <button
+                                      key={sub}
+                                      type="button"
+                                      onClick={() => {
+                                        const updated = [...(currentPlace.subCategories || []), sub];
+                                        setCurrentPlace({ ...currentPlace, subCategories: updated });
+                                      }}
+                                      className="text-[11px] bg-white hover:bg-gray-100 text-gray-600 px-2 py-0.5 rounded-md border border-gray-200 transition-colors cursor-pointer"
+                                    >
+                                      + {sub}
+                                    </button>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex gap-2 pt-1">
+                            <input
+                              type="text"
+                              placeholder="Nhập danh mục phụ mới..."
+                              value={currentPlace.subCategoriesInput || ''}
+                              onChange={(e) => setCurrentPlace({ ...currentPlace, subCategoriesInput: e.target.value })}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const val = currentPlace.subCategoriesInput?.trim();
+                                  if (val && !(currentPlace.subCategories || []).includes(val)) {
+                                    setCurrentPlace({
+                                      ...currentPlace,
+                                      subCategories: [...(currentPlace.subCategories || []), val],
+                                      subCategoriesInput: ''
+                                    });
+                                  }
+                                }
+                              }}
+                              disabled={modalLoading}
+                              className="flex-1 text-xs text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:border-blue-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const val = currentPlace.subCategoriesInput?.trim();
+                                if (val && !(currentPlace.subCategories || []).includes(val)) {
+                                  setCurrentPlace({
+                                    ...currentPlace,
+                                    subCategories: [...(currentPlace.subCategories || []), val],
+                                    subCategoriesInput: ''
+                                  });
+                                }
+                              }}
+                              className="px-3.5 py-1.5 bg-gray-150 hover:bg-gray-250 text-gray-700 text-xs font-semibold rounded-lg transition-colors border border-gray-300 cursor-pointer"
+                            >
+                              Thêm
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right Column: Opening Hours */}
+                      <div className="space-y-3 bg-gray-50/60 p-4 rounded-xl border border-gray-200">
+                        <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                          <Clock size={16} className="text-blue-600" />
+                          Giờ hoạt động chi tiết từng ngày
+                        </label>
+                        <div className="space-y-2.5">
+                          {[
+                            { key: 'monday', label: 'Thứ 2' },
+                            { key: 'tuesday', label: 'Thứ 3' },
+                            { key: 'wednesday', label: 'Thứ 4' },
+                            { key: 'thursday', label: 'Thứ 5' },
+                            { key: 'friday', label: 'Thứ 6' },
+                            { key: 'saturday', label: 'Thứ 7' },
+                            { key: 'sunday', label: 'Chủ nhật' },
+                          ].map((day) => {
+                            const dayHours = currentPlace.openingHours?.[day.key];
+                            const isOpen = Array.isArray(dayHours) && dayHours.length >= 2;
+                            const openTime = isOpen ? dayHours[0] : '08:00';
+                            const closeTime = isOpen ? dayHours[1] : '21:00';
+
+                            return (
+                              <div key={day.key} className="flex items-center justify-between text-xs border-b border-gray-150/60 pb-2.5 last:border-0 last:pb-0">
+                                <div className="flex items-center gap-3">
+                                  <label className="flex items-center cursor-pointer select-none">
+                                    <input
+                                      type="checkbox"
+                                      checked={isOpen}
+                                      onChange={(e) => {
+                                        const checked = e.target.checked;
+                                        const updatedHours = { ...(currentPlace.openingHours || {}) };
+                                        if (checked) {
+                                          updatedHours[day.key] = ['08:00', '21:00'];
+                                        } else {
+                                          updatedHours[day.key] = null;
+                                        }
+                                        setCurrentPlace({ ...currentPlace, openingHours: updatedHours });
+                                      }}
+                                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                                    />
+                                  </label>
+                                  <span className="font-semibold text-gray-700 min-w-[65px]">{day.label}</span>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="time"
+                                    value={openTime}
+                                    disabled={!isOpen || modalLoading}
+                                    onChange={(e) => {
+                                      const updatedHours = { ...(currentPlace.openingHours || {}) };
+                                      updatedHours[day.key] = [e.target.value, closeTime];
+                                      setCurrentPlace({ ...currentPlace, openingHours: updatedHours });
+                                    }}
+                                    className="text-xs text-gray-900 border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white disabled:bg-gray-100 disabled:text-gray-400 focus:outline-none focus:border-blue-500 w-[115px] text-center"
+                                  />
+                                  <span className="text-gray-400 text-xs font-bold">&ndash;</span>
+                                  <input
+                                    type="time"
+                                    value={closeTime}
+                                    disabled={!isOpen || modalLoading}
+                                    onChange={(e) => {
+                                      const updatedHours = { ...(currentPlace.openingHours || {}) };
+                                      updatedHours[day.key] = [openTime, e.target.value];
+                                      setCurrentPlace({ ...currentPlace, openingHours: updatedHours });
+                                    }}
+                                    className="text-xs text-gray-900 border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white disabled:bg-gray-100 disabled:text-gray-400 focus:outline-none focus:border-blue-500 w-[115px] text-center"
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    disabled={modalLoading}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium cursor-pointer"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={modalLoading}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors text-sm font-medium cursor-pointer shadow-sm"
-                  >
-                    {modalLoading && <Loader2 size={16} className="animate-spin" />}
-                    Lưu thay đổi
-                  </button>
+                {/* Footer Buttons */}
+                <div className="flex items-center justify-between pt-4 border-t border-gray-200 mt-4">
+                  <div>
+                    {formSubTab === 'basic' ? (
+                      <button
+                        type="button"
+                        onClick={() => setFormSubTab('extra')}
+                        className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-3 py-2 rounded-lg transition-colors cursor-pointer"
+                      >
+                        Sang Tab 2: Hình ảnh & Giờ mở cửa <ArrowRight size={14} />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setFormSubTab('basic')}
+                        className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-3 py-2 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <ArrowLeft size={14} /> Trở lại Tab 1: Thông tin cơ bản
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsModalOpen(false)}
+                      disabled={modalLoading}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium cursor-pointer"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={modalLoading}
+                      className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors text-sm font-bold cursor-pointer shadow-xs"
+                    >
+                      {modalLoading && <Loader2 size={16} className="animate-spin" />}
+                      Lưu thay đổi
+                    </button>
+                  </div>
                 </div>
               </form>
             )}
