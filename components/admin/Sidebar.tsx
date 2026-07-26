@@ -10,10 +10,12 @@ import {
   MapPin,
   FolderTree,
   BarChart3,
-  MessageSquare,
   Cloud,
   X,
-  Compass
+  Compass,
+  BookOpen,
+  FileText,
+  CheckSquare
 } from 'lucide-react';
 
 const navItems = [
