@@ -1293,41 +1293,23 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                           />
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="space-y-1.5">
-                            <label className="text-sm font-semibold text-gray-700 block">
-                              Danh mục <span className="text-red-500">*</span>
-                            </label>
-                            <select
-                              value={currentPlace.categoryId || ''}
-                              onChange={(e) => setCurrentPlace({ ...currentPlace, categoryId: Number(e.target.value) })}
-                              disabled={modalLoading}
-                              className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
-                            >
-                              <option value="" disabled>Select category</option>
-                              {categories.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div className="space-y-1.5 sm:pt-7">
-                            <label className="flex items-center gap-2 cursor-pointer select-none">
-                              <input
-                                type="checkbox"
-                                id="isApprovedCheckbox"
-                                checked={currentPlace.isApproved === true || currentPlace.isApproved == null}
-                                onChange={(e) => setCurrentPlace({ ...currentPlace, isApproved: e.target.checked })}
-                                disabled={modalLoading}
-                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                              />
-                              <span className="text-xs font-semibold text-gray-700">
-                                Đã phê duyệt (Hiển thị công khai)
-                              </span>
-                            </label>
-                          </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-semibold text-gray-700 block">
+                            Danh mục <span className="text-red-500">*</span>
+                          </label>
+                          <select
+                            value={currentPlace.categoryId || ''}
+                            onChange={(e) => setCurrentPlace({ ...currentPlace, categoryId: Number(e.target.value) })}
+                            disabled={modalLoading}
+                            className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
+                          >
+                            <option value="" disabled>Select category</option>
+                            {categories.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
                         </div>
 
                         <div className="space-y-1.5">
