@@ -402,7 +402,7 @@ export default function ItinerariesPage() {
     return fallback || <MapPin size={18} />;
   };
 
-  // Unified renderer for Itinerary Item Cards (both in Days tab and Overview tab)
+
   const renderItineraryItemCard = (item: any, cardIdx: number, sectionColor?: string | null) => {
     const isPlace = !!item.place;
     const isPlaceholderNote = !item.noteText || item.noteText === 'Thêm ghi chú tại đây';
@@ -468,11 +468,7 @@ export default function ItinerariesPage() {
               <h4 className="font-bold text-sm text-gray-900 dark:text-slate-100">
                 {title}
               </h4>
-              {item.isVisited && (
-                <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md flex items-center gap-1">
-                  <CheckCircle2 size={12} /> Đã ghé
-                </span>
-              )}
+              
             </div>
 
             {/* Todo Checklist items list */}
@@ -538,69 +534,39 @@ export default function ItinerariesPage() {
         </div>
 
         {/* Custom note by user */}
-        {customNote && (
-          <p className="text-xs text-gray-600 dark:text-slate-300 italic font-medium bg-gray-50/80 dark:bg-slate-950 p-2.5 rounded-xl border border-gray-100 dark:border-slate-800">
+        {customNote && customNote.trim() !== '' && (
+          <p className="text-xs text-gray-600 dark:text-slate-300 font-medium py-1">
             "{customNote}"
           </p>
         )}
 
         {/* Action / Specs Badges Row */}
-        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-gray-100 dark:border-slate-800/80 text-xs">
-          {/* Ghé thăm */}
-          <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 font-bold rounded-xl border transition-colors ${
-              item.isVisited
-                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/60'
-                : 'bg-gray-50 text-gray-400 dark:bg-slate-800/60 dark:text-slate-500 border-gray-100 dark:border-slate-800'
-            }`}
-          >
-            <CheckCircle2 size={13} className={item.isVisited ? 'text-emerald-600' : 'opacity-40'} />
-            {item.isVisited ? 'Đã ghé thăm' : 'Đánh dấu ghé thăm'}
-          </span>
+        {(item.startTime || item.endTime || expenseAmount || reactions.length > 0) && (
+          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-gray-100 dark:border-slate-800/80 text-xs">
+            {/* Giờ */}
+            {(item.startTime || item.endTime) && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 font-bold rounded-xl border transition-colors bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-900/60 shadow-2xs">
+                <Clock size={13} className="text-blue-600" />
+                {`${item.startTime || '00:00'} - ${item.endTime || '00:00'}`}
+              </span>
+            )}
 
-          {/* Giờ */}
-          <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 font-bold rounded-xl border transition-colors ${
-              item.startTime || item.endTime
-                ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-900/60'
-                : 'bg-gray-50 text-gray-400 dark:bg-slate-800/60 dark:text-slate-500 border-gray-100 dark:border-slate-800'
-            }`}
-          >
-            <Clock size={13} className={item.startTime || item.endTime ? 'text-blue-600' : 'opacity-40'} />
-            {item.startTime || item.endTime ? `${item.startTime || '00:00'} - ${item.endTime || '00:00'}` : 'Thêm giờ'}
-          </span>
+            {/* Chi phí / Giá */}
+            {expenseAmount && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-extrabold rounded-xl border border-purple-200 dark:border-purple-900/60">
+                <DollarSign size={13} className="text-purple-600" />
+                {expenseAmount}
+              </span>
+            )}
 
-          {/* Đính kèm */}
-          <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 font-bold rounded-xl border transition-colors ${
-              attachments.length > 0
-                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-900/60'
-                : 'bg-gray-50 text-gray-400 dark:bg-slate-800/60 dark:text-slate-500 border-gray-100 dark:border-slate-800'
-            }`}
-          >
-            <Paperclip size={13} className={attachments.length > 0 ? 'text-indigo-600' : 'opacity-40'} />
-            {attachments.length > 0 ? `Đính kèm (${attachments.length})` : 'Đính kèm'}
-          </span>
-
-          {/* Chi phí / Giá */}
-          {expenseAmount && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 font-extrabold rounded-xl border border-purple-200 dark:border-purple-900/60">
-              <DollarSign size={13} className="text-purple-600" />
-              {expenseAmount}
-            </span>
-          )}
-
-          {/* Emojis / Reactions */}
-          {reactions.length > 0 ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 dark:bg-amber-950/60 rounded-full border border-amber-200 dark:border-amber-900 text-xs">
-              {reactions.map((r: any) => typeof r === 'string' ? r : (r.emoji || '😊')).join(' ')}
-            </span>
-          ) : (
-            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gray-50 dark:bg-slate-800 text-gray-400 border border-gray-100 dark:border-slate-800">
-              <Smile size={14} className="opacity-40" />
-            </span>
-          )}
-        </div>
+            {/* Emojis / Reactions */}
+            {reactions.length > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 dark:bg-amber-950/60 rounded-full border border-amber-200 dark:border-amber-900 text-xs">
+                {reactions.map((r: any) => (typeof r === 'string' ? r : r.emoji || '😊')).join(' ')}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Todo Checklist items list if any */}
         {todos.length > 0 && (
@@ -652,6 +618,7 @@ export default function ItinerariesPage() {
   const [tripDetailLoading, setTripDetailLoading] = useState(false);
   const [selectedTripDetail, setSelectedTripDetail] = useState<any>(null);
   const [tripDetailActiveTab, setTripDetailActiveTab] = useState<'days' | 'overview' | 'expenses' | 'members'>('days');
+  const [guideDetailActiveTab, setGuideDetailActiveTab] = useState<'overview' | 'members'>('overview');
 
   // Place Detail Modal State
   const [selectedPlaceItem, setSelectedPlaceItem] = useState<any>(null);
@@ -763,6 +730,7 @@ export default function ItinerariesPage() {
   const handleOpenGuideDetail = async (id: number | string) => {
     setIsGuideDetailOpen(true);
     setGuideDetailLoading(true);
+    setGuideDetailActiveTab('overview');
     try {
       const res = await fetch(`/api/admin/itineraries/${id}`);
       if (!res.ok) throw new Error('Lỗi khi tải thông tin Hướng dẫn.');
@@ -1206,8 +1174,23 @@ export default function ItinerariesPage() {
                         </td>
 
                         <td className="px-6 py-3.5">
-                          <span className="font-semibold text-xs text-gray-900 dark:text-slate-100 block">{t.user?.fullName || 'N/A'}</span>
-                          <span className="text-[11px] text-indigo-600 block">{t._count?.members || 1} thành viên</span>
+                          <div className="flex items-center gap-2">
+                            {t.user?.avatar ? (
+                              <img
+                                src={t.user.avatar}
+                                alt={t.user.fullName}
+                                className="w-7 h-7 rounded-full object-cover border border-gray-200 dark:border-slate-800 shadow-2xs"
+                              />
+                            ) : (
+                              <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                                {(t.user?.fullName || 'D')[0].toUpperCase()}
+                              </div>
+                            )}
+                            <div>
+                              <span className="font-semibold text-xs text-gray-900 dark:text-slate-100 block">{t.user?.fullName || 'N/A'}</span>
+                              <span className="text-[11px] text-indigo-600 block">{t._count?.members || 1} thành viên</span>
+                            </div>
+                          </div>
                         </td>
 
                         <td className="px-6 py-3.5">
@@ -1293,17 +1276,77 @@ export default function ItinerariesPage() {
                       <th className="px-6 py-3.5">Bài Hướng dẫn</th>
                       <th className="px-6 py-3.5">Điểm đến</th>
                       <th className="px-6 py-3.5 text-center">Địa điểm gợi ý</th>
+                      <th className="px-6 py-3.5">Bạn đồng hành</th>
                       <th className="px-6 py-3.5">Tác giả</th>
+                      <th className="px-6 py-3.5 text-center">Trạng thái</th>
                       <th className="px-6 py-3.5 text-center">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                     {filteredGuides.map((g) => (
                       <tr key={g.id} className="hover:bg-gray-50/40 dark:hover:bg-slate-800/20">
-                        <td className="px-6 py-3.5 font-bold text-gray-900 dark:text-slate-100">{g.title}</td>
+                        <td className="px-6 py-3.5">
+                          <div className="flex items-center gap-3">
+                            {g.coverImage ? (
+                              <img
+                                src={g.coverImage}
+                                alt={g.title}
+                                className="w-12 h-12 rounded-xl object-cover border border-gray-200 dark:border-slate-800 shrink-0 shadow-2xs"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-2xs font-bold text-sm">
+                                📖
+                              </div>
+                            )}
+                            <div>
+                              <span className="font-extrabold text-sm text-gray-900 dark:text-slate-100 block leading-snug">
+                                {g.title}
+                              </span>
+                              <span className="text-[11px] text-gray-400 font-medium">
+                                #{g.id}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
                         <td className="px-6 py-3.5 font-semibold text-gray-900 dark:text-slate-100">{g.destination}</td>
                         <td className="px-6 py-3.5 text-center font-bold">{g._count?.savedPlaces || 0} điểm</td>
-                        <td className="px-6 py-3.5 font-semibold text-xs">{g.user?.fullName || 'N/A'}</td>
+                        <td className="px-6 py-3.5 font-semibold text-xs">
+                          {g.companion ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 font-bold rounded-lg text-[11px]">
+                              👥 {g.companion}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 font-normal">Chưa chọn</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-3.5 font-semibold text-xs">
+                          <div className="flex items-center gap-2">
+                            {g.user?.avatar ? (
+                              <img
+                                src={g.user.avatar}
+                                alt={g.user.fullName}
+                                className="w-7 h-7 rounded-full object-cover border border-gray-200 dark:border-slate-800 shadow-2xs"
+                              />
+                            ) : (
+                              <div className="w-7 h-7 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                                {(g.user?.fullName || 'D')[0].toUpperCase()}
+                              </div>
+                            )}
+                            <span className="font-semibold text-xs text-gray-900 dark:text-slate-100">
+                              {g.user?.fullName || 'N/A'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-3.5 text-center">
+                          {(() => {
+                            const priv = getPrivacyBadgeInfo(null, g);
+                            return (
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold border ${priv.badgeClass}`}>
+                                {priv.icon} {priv.label}
+                              </span>
+                            );
+                          })()}
+                        </td>
                         <td className="px-6 py-3.5 text-center">
                           <div className="flex items-center justify-center gap-2">
                             <button
@@ -2043,75 +2086,153 @@ export default function ItinerariesPage() {
                   </div>
                 </div>
 
+                {/* Sub Tabs Bar */}
+                <div className="flex border-b border-gray-200 dark:border-slate-800 bg-gray-100/50 dark:bg-slate-950/50 px-6 pt-2 text-xs font-bold gap-2">
+                  <button
+                    onClick={() => setGuideDetailActiveTab('overview')}
+                    className={`px-4 py-2.5 rounded-t-xl border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
+                      guideDetailActiveTab === 'overview'
+                        ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900'
+                        : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <Layers size={14} />
+                    Địa điểm lưu tổng quan ({selectedGuideDetail.savedPlaces?.length || 0})
+                  </button>
+                  <button
+                    onClick={() => setGuideDetailActiveTab('members')}
+                    className={`px-4 py-2.5 rounded-t-xl border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
+                      guideDetailActiveTab === 'members'
+                        ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900'
+                        : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <Users size={14} />
+                    Thành viên & Lời mời ({(selectedGuideDetail.members?.length || 0) + 1})
+                  </button>
+                </div>
+
                 <div className="p-6 flex-1 overflow-y-auto space-y-4">
-                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                    Danh sách địa điểm lưu gợi ý ({selectedGuideDetail.savedPlaces?.length || 0})
-                  </h4>
-                  {(() => {
-                    const grouped = groupSavedPlacesBySection(
-                      selectedGuideDetail.sections,
-                      selectedGuideDetail.savedPlaces
-                    );
+                  {guideDetailActiveTab === 'overview' && (
+                    <>
+                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                        Danh sách địa điểm lưu gợi ý ({selectedGuideDetail.savedPlaces?.length || 0})
+                      </h4>
+                      {(() => {
+                        const grouped = groupSavedPlacesBySection(
+                          selectedGuideDetail.sections,
+                          selectedGuideDetail.savedPlaces
+                        );
 
-                    if (grouped.length === 0 || selectedGuideDetail.savedPlaces?.length === 0) {
-                      return (
-                        <p className="text-gray-400 italic text-sm text-center py-6">
-                          Chưa có địa điểm lưu nào.
-                        </p>
-                      );
-                    }
-
-                    return grouped.map(({ section, items }, idx) => {
-                      const isChecklist = section.sectionType === 'CHECKLIST';
-                      const sectionColor = parseSectionColor(section.colorCode);
-
-                      return (
-                        <div
-                          key={section.id || section.name || idx}
-                          className="border border-gray-200 dark:border-slate-800 rounded-2xl p-4 bg-gray-50/50 dark:bg-slate-950/40 space-y-3"
-                        >
-                          {/* Section Header */}
-                          <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 pb-2.5">
-                            <div className="flex items-center gap-2.5">
-                              <div
-                                className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold shrink-0 ${
-                                  isChecklist
-                                    ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400'
-                                    : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400'
-                                }`}
-                              >
-                                {isChecklist ? <CheckSquare size={15} /> : <Layers size={15} />}
-                              </div>
-                              <div>
-                                <h4 className="font-bold text-sm text-gray-900 dark:text-slate-100">
-                                  {section.name}
-                                </h4>
-                                {section.subTitle && (
-                                  <p className="text-xs text-gray-500 dark:text-slate-400">
-                                    {section.subTitle}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                            <span className="text-xs font-bold text-gray-600 dark:text-slate-400 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 px-2.5 py-1 rounded-xl">
-                              {items.length} địa điểm
-                            </span>
-                          </div>
-
-                          {/* Section Items */}
-                          {items.length === 0 ? (
-                            <p className="text-xs text-gray-400 italic py-2">
-                              Chưa có địa điểm trong mục này.
+                        if (grouped.length === 0 || selectedGuideDetail.savedPlaces?.length === 0) {
+                          return (
+                            <p className="text-gray-400 italic text-sm text-center py-6">
+                              Chưa có địa điểm lưu nào.
                             </p>
-                          ) : (
-                            <div className="space-y-2.5">
-                              {items.map((sp: any, iIdx: number) => renderItineraryItemCard(sp, iIdx, sectionColor))}
+                          );
+                        }
+
+                        return grouped.map(({ section, items }, idx) => {
+                          const isChecklist = section.sectionType === 'CHECKLIST';
+                          const sectionColor = parseSectionColor(section.colorCode);
+
+                          return (
+                            <div
+                              key={section.id || section.name || idx}
+                              className="border border-gray-200 dark:border-slate-800 rounded-2xl p-4 bg-gray-50/50 dark:bg-slate-950/40 space-y-3"
+                            >
+                              {/* Section Header */}
+                              <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 pb-2.5">
+                                <div className="flex items-center gap-2.5">
+                                  <div
+                                    className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold shrink-0 ${
+                                      isChecklist
+                                        ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400'
+                                        : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400'
+                                    }`}
+                                  >
+                                    {isChecklist ? <CheckSquare size={15} /> : <Layers size={15} />}
+                                  </div>
+                                  <div>
+                                    <h4 className="font-bold text-sm text-gray-900 dark:text-slate-100">
+                                      {section.name}
+                                    </h4>
+                                    {section.subTitle && (
+                                      <p className="text-xs text-gray-500 dark:text-slate-400">
+                                        {section.subTitle}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                                <span className="text-xs font-bold text-gray-600 dark:text-slate-400 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 px-2.5 py-1 rounded-xl">
+                                  {items.length} địa điểm
+                                </span>
+                              </div>
+
+                              {/* Section Items */}
+                              {items.length === 0 ? (
+                                <p className="text-xs text-gray-400 italic py-2">
+                                  Chưa có địa điểm trong mục này.
+                                </p>
+                              ) : (
+                                <div className="space-y-2.5">
+                                  {items.map((sp: any, iIdx: number) => renderItineraryItemCard(sp, iIdx, sectionColor))}
+                                </div>
+                              )}
                             </div>
-                          )}
+                          );
+                        });
+                      })()}
+                    </>
+                  )}
+
+                  {/* TAB 2: THÀNH VIÊN & LỜI MỜI */}
+                  {guideDetailActiveTab === 'members' && (
+                    <div className="space-y-4">
+                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                        Tác giả & Thành viên tham gia ({(selectedGuideDetail.members?.length || 0) + 1})
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {/* Author */}
+                        <div className="p-3.5 rounded-xl border border-indigo-200 dark:border-indigo-900/40 bg-indigo-50/40 dark:bg-indigo-950/20 flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-indigo-100 overflow-hidden flex items-center justify-center shrink-0 border border-indigo-300">
+                            <img src={selectedGuideDetail.user?.avatar || '/default-avatar.jpg'} alt="Avatar" className="w-full h-full object-cover" />
+                          </div>
+                          <div>
+                            <span className="font-bold text-xs text-gray-900 dark:text-slate-100 block">{selectedGuideDetail.user?.fullName || 'Tác giả'}</span>
+                            <span className="text-[11px] text-indigo-600 dark:text-indigo-400 block font-semibold">{selectedGuideDetail.user?.email || 'N/A'} • Tác giả (Owner)</span>
+                          </div>
                         </div>
-                      );
-                    });
-                  })()}
+
+                        {/* Other Members */}
+                        {selectedGuideDetail.members?.filter((m: any) => m.userId !== selectedGuideDetail.userId).map((m: any) => (
+                          <div key={m.id} className="p-3.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-blue-100 overflow-hidden flex items-center justify-center shrink-0">
+                              <img src={m.user?.avatar || '/default-avatar.jpg'} alt="Avatar" className="w-full h-full object-cover" />
+                            </div>
+                            <div>
+                              <span className="font-bold text-xs text-gray-900 dark:text-slate-100 block">{m.user?.fullName}</span>
+                              <span className="text-[11px] text-gray-400 block">{m.user?.email} • Vai trò: <strong className="text-blue-600">{m.role}</strong></span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {selectedGuideDetail.invites?.length > 0 && (
+                        <>
+                          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-2">Lời mời cộng tác ({selectedGuideDetail.invites.length})</h4>
+                          <div className="space-y-2">
+                            {selectedGuideDetail.invites.map((inv: any) => (
+                              <div key={inv.id} className="p-3 rounded-xl border border-amber-200 bg-amber-50/40 text-xs flex justify-between items-center">
+                                <span>📧 Lời mời tới: <strong>{inv.email || 'Token Link'}</strong> (Vai trò: {inv.role})</span>
+                                <span className="font-bold text-amber-700">{inv.status}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-4 border-t border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-950 flex justify-end gap-3">
@@ -2529,17 +2650,7 @@ export default function ItinerariesPage() {
 
                 {/* Action / Specs Badges Row (User custom info matching item card bar) */}
                 <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-blue-100 dark:border-blue-900/40 text-xs">
-                  {/* Ghé thăm */}
-                  <span
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 font-bold rounded-xl border transition-colors ${
-                      selectedPlaceItem.isVisited
-                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/60 shadow-2xs'
-                        : 'bg-white dark:bg-slate-900 text-gray-400 dark:text-slate-500 border-gray-200 dark:border-slate-800'
-                    }`}
-                  >
-                    <CheckCircle2 size={14} className={selectedPlaceItem.isVisited ? 'text-emerald-600' : 'opacity-40'} />
-                    {selectedPlaceItem.isVisited ? 'Đã ghé thăm' : 'Đánh dấu ghé thăm'}
-                  </span>
+                  
 
                   {/* Giờ */}
                   <span
@@ -2554,23 +2665,6 @@ export default function ItinerariesPage() {
                       ? `${selectedPlaceItem.startTime || '00:00'} - ${selectedPlaceItem.endTime || '00:00'}`
                       : 'Thêm giờ'}
                   </span>
-
-                  {/* Đính kèm */}
-                  {(() => {
-                    const atts = parseJsonArray(selectedPlaceItem.attachments);
-                    return (
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 font-bold rounded-xl border transition-colors ${
-                          atts.length > 0
-                            ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-900/60 shadow-2xs'
-                            : 'bg-white dark:bg-slate-900 text-gray-400 dark:text-slate-500 border-gray-200 dark:border-slate-800'
-                        }`}
-                      >
-                        <Paperclip size={14} className={atts.length > 0 ? 'text-indigo-600' : 'opacity-40'} />
-                        {atts.length > 0 ? `Đính kèm (${atts.length})` : 'Đính kèm'}
-                      </span>
-                    );
-                  })()}
 
                   {/* Chi phí do người dùng thêm */}
                   {selectedPlaceItem.expense && (
