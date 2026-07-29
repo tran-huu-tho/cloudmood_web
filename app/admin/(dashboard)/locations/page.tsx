@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useState, useTransition, startTransition } from 'react';
+import React, { useEffect, useState, useRef, useTransition, startTransition } from 'react';
 import dynamic from 'next/dynamic';
 import { Place, Category } from '@/lib/supabase/types';
-import { Plus, Edit2, Trash2, Search, X, Loader2, MapPin, ExternalLink, Check, Upload, Star, MessageSquare, Calendar, Clock, Image as ImageIcon, Info, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, X, Loader2, MapPin, ExternalLink, Check, Upload, Star, MessageSquare, Calendar, Clock, Image as ImageIcon, Info, ArrowRight, ArrowLeft, Layers, AlertCircle } from 'lucide-react';
 import { cleanAddress, formatPrice } from '@/lib/utils';
 import { getCategoryIcon } from '../categories/page';
 
@@ -175,6 +175,76 @@ export default function LocationsPage() {
     urlThumbnail: '',
     caption: '',
   });
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+
+  // File Upload Refs & Compressor
+  const thumbnailInputRef = useRef<HTMLInputElement>(null);
+  const detailPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  const compressImageFile = (file: File, maxWidth = 1200, quality = 0.85): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          } else {
+            resolve(event.target?.result as string);
+          }
+        };
+        img.onerror = () => resolve(event.target?.result as string);
+        img.src = event.target?.result as string;
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleThumbnailFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const compressed = await compressImageFile(file, 1200, 0.85);
+      if (compressed) {
+        setCurrentPlace((prev: any) => ({ ...prev, image: compressed }));
+        showToast('Đã tải và tối ưu ảnh đại diện từ máy thành công!', 'success');
+      }
+    } catch (err) {
+      showToast('Lỗi khi đọc file ảnh.', 'error');
+    }
+  };
+
+  const handleDetailPhotoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const compressed = await compressImageFile(file, 1200, 0.85);
+      if (compressed) {
+        setNewPhoto((prev) => ({ ...prev, urlOriginal: compressed }));
+        setPhotoError(null);
+        showToast('Đã tải và tối ưu ảnh từ máy! Bấm "Thêm ảnh" để lưu.', 'success');
+      }
+    } catch (err) {
+      setPhotoError('Lỗi khi đọc file ảnh từ máy.');
+    }
+  };
 
   // Delete State
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -258,6 +328,9 @@ export default function LocationsPage() {
     setActiveTab('general');
     setFormSubTab('basic');
     setModalError(null);
+    setPhotoError(null);
+    setReviewError(null);
+    setNewPhoto({ urlOriginal: '', urlThumbnail: '', caption: '' });
     setIsModalOpen(true);
   };
 
@@ -301,6 +374,9 @@ export default function LocationsPage() {
     setActiveTab('general');
     setFormSubTab('basic');
     setModalError(null);
+    setPhotoError(null);
+    setReviewError(null);
+    setNewPhoto({ urlOriginal: '', urlThumbnail: '', caption: '' });
     setIsModalOpen(true);
     
     fetchReviewsAndPhotos(Number(place.id));
@@ -342,6 +418,9 @@ export default function LocationsPage() {
     setModalType('edit');
     setActiveTab('reviews');
     setModalError(null);
+    setPhotoError(null);
+    setReviewError(null);
+    setNewPhoto({ urlOriginal: '', urlThumbnail: '', caption: '' });
     setIsModalOpen(true);
     
     fetchReviewsAndPhotos(Number(place.id));
@@ -383,6 +462,9 @@ export default function LocationsPage() {
     setModalType('edit');
     setActiveTab('photos');
     setModalError(null);
+    setPhotoError(null);
+    setReviewError(null);
+    setNewPhoto({ urlOriginal: '', urlThumbnail: '', caption: '' });
     setIsModalOpen(true);
     
     fetchReviewsAndPhotos(Number(place.id));
@@ -482,8 +564,9 @@ export default function LocationsPage() {
 
   const handleAddReview = async (e: React.FormEvent) => {
     e.preventDefault();
+    setReviewError(null);
     if (!newReview.authorName.trim() || !newReview.comment.trim()) {
-      alert('Vui lòng nhập đầy đủ tên và nhận xét.');
+      setReviewError('Vui lòng nhập đầy đủ tên người đánh giá và nhận xét.');
       return;
     }
     
@@ -509,14 +592,15 @@ export default function LocationsPage() {
       
       setPlaceReviews(prev => [data, ...prev]);
       setNewReview({ authorName: '', rating: 5, comment: '', publishedDate: '', authorLocation: '' });
+      setReviewError(null);
       showToast('Thêm đánh giá thành công!', 'success');
     } catch (err: any) {
+      setReviewError(err.message || 'Lỗi khi thêm đánh giá.');
       showToast(err.message || 'Lỗi khi thêm đánh giá.', 'error');
     }
   };
 
   const handleDeletePhoto = async (photoId: number) => {
-    if (!confirm('Bạn có chắc chắn muốn xóa ảnh này?')) return;
     try {
       const res = await fetch(`/api/admin/places/photos/${photoId}`, {
         method: 'DELETE',
@@ -532,8 +616,14 @@ export default function LocationsPage() {
 
   const handleAddPhoto = async (e: React.FormEvent) => {
     e.preventDefault();
+    setPhotoError(null);
     if (!newPhoto.urlOriginal.trim()) {
-      alert('Vui lòng nhập URL ảnh.');
+      setPhotoError('Vui lòng nhập đường dẫn URL ảnh chi tiết trước khi thêm.');
+      return;
+    }
+
+    if (newPhoto.urlOriginal.trim().startsWith('blob:')) {
+      setPhotoError('Link dạng blob:... chỉ tồn tại tạm thời trong tab Zalo. Vui lòng sử dụng nút "Chọn ảnh từ máy" hoặc dán Link URL web trực tiếp (https://...).');
       return;
     }
     
@@ -555,8 +645,10 @@ export default function LocationsPage() {
       
       setPlacePhotos(prev => [data, ...prev]);
       setNewPhoto({ urlOriginal: '', urlThumbnail: '', caption: '' });
+      setPhotoError(null);
       showToast('Thêm hình ảnh thành công!', 'success');
     } catch (err: any) {
+      setPhotoError(err.message || 'Lỗi khi thêm hình ảnh.');
       showToast(err.message || 'Lỗi khi thêm hình ảnh.', 'error');
     }
   };
@@ -1298,12 +1390,11 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                             Danh mục <span className="text-red-500">*</span>
                           </label>
                           <select
-                            value={currentPlace.categoryId || ''}
+                            value={currentPlace.categoryId || (categories[0]?.id ? Number(categories[0].id) : '')}
                             onChange={(e) => setCurrentPlace({ ...currentPlace, categoryId: Number(e.target.value) })}
                             disabled={modalLoading}
                             className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
                           >
-                            <option value="" disabled>Select category</option>
                             {categories.map((c) => (
                               <option key={c.id} value={c.id}>
                                 {c.name}
@@ -1432,13 +1523,29 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                         {/* Image Link & Large Preview */}
                         <div className="space-y-3 bg-gray-50/60 p-4 rounded-xl border border-gray-200">
                           <div className="space-y-1.5">
-                            <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
-                              <ImageIcon size={16} className="text-blue-600" />
-                              Ảnh minh họa (Link URL)
-                            </label>
+                            <div className="flex items-center justify-between">
+                              <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                                <ImageIcon size={16} className="text-blue-600" />
+                                Ảnh minh họa đại diện
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => thumbnailInputRef.current?.click()}
+                                className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-md border border-blue-200 transition-colors cursor-pointer"
+                              >
+                                <Upload size={13} /> Chọn ảnh từ máy...
+                              </button>
+                              <input
+                                type="file"
+                                ref={thumbnailInputRef}
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleThumbnailFileChange}
+                              />
+                            </div>
                             <input
                               type="text"
-                              placeholder="Nhập đường dẫn hình ảnh (https://...)"
+                              placeholder="Dán đường dẫn link URL (https://...) hoặc bấm 'Chọn ảnh từ máy'"
                               value={currentPlace.image || ''}
                               onChange={(e) => setCurrentPlace({ ...currentPlace, image: e.target.value })}
                               disabled={modalLoading}
@@ -1463,7 +1570,7 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                                 <div className="flex flex-col items-center justify-center text-gray-400 p-4 text-center">
                                   <ImageIcon size={36} className="mb-2 text-gray-300" />
                                   <span className="text-xs font-medium">Chưa có ảnh minh họa</span>
-                                  <span className="text-[11px] text-gray-400 mt-0.5">Nhập link URL ở trên để xem trước tại đây</span>
+                                  <span className="text-[11px] text-gray-400 mt-0.5">Dán link URL hoặc bấm 'Chọn ảnh từ máy' ở trên</span>
                                 </div>
                               )}
                             </div>
@@ -1561,7 +1668,10 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                       </div>
 
                       {/* Right Column: Opening Hours */}
-                      <div className="space-y-3 bg-gray-50/60 p-4 rounded-xl border border-gray-200">
+                      <div className="space-y-4">
+
+                        {/* Opening Hours (Giờ hoạt động chi tiết từng ngày) */}
+                        <div className="space-y-3 bg-gray-50/60 p-4 rounded-xl border border-gray-200">
                         <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
                           <Clock size={16} className="text-blue-600" />
                           Giờ hoạt động chi tiết từng ngày
@@ -1635,6 +1745,7 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                         </div>
                       </div>
                     </div>
+                  </div>
                   )}
                 </div>
 
@@ -1794,6 +1905,15 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                                 src={photo.urlOriginal} 
                                 alt={photo.caption || ""} 
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                onError={(e) => {
+                                  const target = e.target as HTMLElement;
+                                  target.style.display = 'none';
+                                  const parent = target.parentElement;
+                                  if (parent) {
+                                    parent.classList.add('flex', 'flex-col', 'items-center', 'justify-center', 'bg-rose-50', 'p-2', 'text-center');
+                                    parent.innerHTML = '<div class="text-[11px] text-rose-600 font-bold">⚠️ Link ảnh hỏng</div><div class="text-[10px] text-gray-400 italic">Bấm 🗑️ để xóa</div>';
+                                  }
+                                }}
                               />
                             </div>
                             
@@ -1824,32 +1944,47 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                       Thêm ảnh mới
                     </h4>
 
+                    {photoError && (
+                      <div className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg p-2.5 font-medium flex items-center gap-1.5 animate-in fade-in duration-150">
+                        <AlertCircle size={14} className="shrink-0" />
+                        <span>{photoError}</span>
+                      </div>
+                    )}
+
                     <div className="space-y-3 text-xs">
+                      {/* Device File Picker Button */}
                       <div className="space-y-1">
-                        <label className="font-semibold text-gray-750">Đường dẫn ảnh (Original URL) *</label>
+                        <label className="font-semibold text-gray-750 block">Chọn ảnh từ máy tính</label>
+                        <button
+                          type="button"
+                          onClick={() => detailPhotoInputRef.current?.click()}
+                          className="w-full flex items-center justify-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold px-3 py-2 rounded-lg border border-purple-200 text-xs transition-colors cursor-pointer"
+                        >
+                          <Upload size={14} /> Chọn ảnh từ máy...
+                        </button>
                         <input
-                          type="url"
+                          type="file"
+                          ref={detailPhotoInputRef}
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleDetailPhotoFileChange}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="font-semibold text-gray-750 block">Hoặc dán Link URL ảnh *</label>
+                        <input
+                          type="text"
                           required
                           value={newPhoto.urlOriginal}
                           onChange={(e) => setNewPhoto({ ...newPhoto, urlOriginal: e.target.value })}
-                          placeholder="https://images.unsplash.com/..."
+                          placeholder="https://images.unsplash.com/... hoặc chọn ảnh ở trên"
                           className="w-full text-xs text-gray-900 border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-blue-500"
                         />
                       </div>
 
                       <div className="space-y-1">
-                        <label className="font-semibold text-gray-750">Đường dẫn thu nhỏ (Thumbnail URL)</label>
-                        <input
-                          type="url"
-                          value={newPhoto.urlThumbnail}
-                          onChange={(e) => setNewPhoto({ ...newPhoto, urlThumbnail: e.target.value })}
-                          placeholder="Nếu trống sẽ dùng đường dẫn gốc..."
-                          className="w-full text-xs text-gray-900 border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-blue-500"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="font-semibold text-gray-750">Chú thích ảnh</label>
+                        <label className="font-semibold text-gray-750 block">Chú thích ảnh (Tùy chọn)</label>
                         <input
                           type="text"
                           value={newPhoto.caption}
@@ -1862,9 +1997,9 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
 
                     <button
                       type="submit"
-                      className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg text-xs transition-colors shadow-sm cursor-pointer"
+                      className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs transition-colors shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
                     >
-                      Lưu ảnh
+                      <Plus size={14} /> Thêm ảnh vào bộ sưu tập
                     </button>
                   </form>
                 </div>

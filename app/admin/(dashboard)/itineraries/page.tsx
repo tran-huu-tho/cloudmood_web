@@ -655,7 +655,10 @@ export default function ItinerariesPage() {
     setTripDetailActiveTab('days');
     try {
       const res = await fetch(`/api/admin/itineraries/${id}`);
-      if (!res.ok) throw new Error('Lỗi khi lấy thông tin chi tiết chuyến đi.');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || errData.error || `Lỗi (${res.status}): Không thể lấy thông tin chuyến đi.`);
+      }
       const data = await res.json();
       setSelectedTripDetail(data);
     } catch (err: any) {
@@ -733,7 +736,10 @@ export default function ItinerariesPage() {
     setGuideDetailActiveTab('overview');
     try {
       const res = await fetch(`/api/admin/itineraries/${id}`);
-      if (!res.ok) throw new Error('Lỗi khi tải thông tin Hướng dẫn.');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || errData.error || `Lỗi (${res.status}): Không thể tải thông tin Hướng dẫn.`);
+      }
       const data = await res.json();
       setSelectedGuideDetail(data);
     } catch (err: any) {
@@ -1556,7 +1562,7 @@ export default function ItinerariesPage() {
                 <div className="px-6 py-3 bg-gray-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-blue-100 overflow-hidden shrink-0 border border-blue-200">
-                      <img src={selectedTripDetail.user?.avatar || '/default-avatar.jpg'} alt="User" className="w-full h-full object-cover" />
+                      <img src={selectedTripDetail.user?.avatar || '/default-avatar.svg'} alt="User" className="w-full h-full object-cover" />
                     </div>
                     <div>
                       <span className="font-bold text-gray-900 dark:text-slate-100 block">{selectedTripDetail.user?.fullName}</span>
@@ -1981,7 +1987,7 @@ export default function ItinerariesPage() {
                         {selectedTripDetail.members?.map((m: any) => (
                           <div key={m.id} className="p-3.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full bg-blue-100 overflow-hidden flex items-center justify-center shrink-0">
-                              <img src={m.user?.avatar || '/default-avatar.jpg'} alt="Avatar" className="w-full h-full object-cover" />
+                              <img src={m.user?.avatar || '/default-avatar.svg'} alt="Avatar" className="w-full h-full object-cover" />
                             </div>
                             <div>
                               <span className="font-bold text-xs text-gray-900 dark:text-slate-100 block">{m.user?.fullName}</span>
@@ -2072,7 +2078,7 @@ export default function ItinerariesPage() {
                 <div className="px-6 py-3 bg-gray-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-indigo-100 overflow-hidden shrink-0 border border-indigo-200">
-                      <img src={selectedGuideDetail.user?.avatar || '/default-avatar.jpg'} alt="User" className="w-full h-full object-cover" />
+                      <img src={selectedGuideDetail.user?.avatar || '/default-avatar.svg'} alt="User" className="w-full h-full object-cover" />
                     </div>
                     <div>
                       <span className="font-bold text-gray-900 dark:text-slate-100 block">{selectedGuideDetail.user?.fullName || 'Tác giả'}</span>
@@ -2196,7 +2202,7 @@ export default function ItinerariesPage() {
                         {/* Author */}
                         <div className="p-3.5 rounded-xl border border-indigo-200 dark:border-indigo-900/40 bg-indigo-50/40 dark:bg-indigo-950/20 flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-indigo-100 overflow-hidden flex items-center justify-center shrink-0 border border-indigo-300">
-                            <img src={selectedGuideDetail.user?.avatar || '/default-avatar.jpg'} alt="Avatar" className="w-full h-full object-cover" />
+                            <img src={selectedGuideDetail.user?.avatar || '/default-avatar.svg'} alt="Avatar" className="w-full h-full object-cover" />
                           </div>
                           <div>
                             <span className="font-bold text-xs text-gray-900 dark:text-slate-100 block">{selectedGuideDetail.user?.fullName || 'Tác giả'}</span>
@@ -2208,7 +2214,7 @@ export default function ItinerariesPage() {
                         {selectedGuideDetail.members?.filter((m: any) => m.userId !== selectedGuideDetail.userId).map((m: any) => (
                           <div key={m.id} className="p-3.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full bg-blue-100 overflow-hidden flex items-center justify-center shrink-0">
-                              <img src={m.user?.avatar || '/default-avatar.jpg'} alt="Avatar" className="w-full h-full object-cover" />
+                              <img src={m.user?.avatar || '/default-avatar.svg'} alt="Avatar" className="w-full h-full object-cover" />
                             </div>
                             <div>
                               <span className="font-bold text-xs text-gray-900 dark:text-slate-100 block">{m.user?.fullName}</span>
@@ -2266,9 +2272,19 @@ export default function ItinerariesPage() {
                 {selectedBlog.items?.map((item: any) => {
                   const isHeader = item.itemType === 'SECTION_HEADER';
                   const isNote = item.itemType === 'NOTE';
-                  const isPlace = item.itemType === 'PLACE' || !!item.place;
 
                   const contentText = item.content && item.content !== 'Thêm ghi chú tại đây' ? item.content : null;
+
+                  // Parse JSON Checklist item
+                  let jsonChecklist: any = null;
+                  if (contentText && typeof contentText === 'string' && contentText.trim().startsWith('{')) {
+                    try {
+                      const parsed = JSON.parse(contentText);
+                      if (parsed && (parsed.title || Array.isArray(parsed.items))) {
+                        jsonChecklist = parsed;
+                      }
+                    } catch (e) {}
+                  }
 
                   if (isHeader) {
                     return (
@@ -2285,6 +2301,33 @@ export default function ItinerariesPage() {
                       <div key={item.id} className="p-3 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/30 text-xs">
                         <span className="font-bold text-amber-700 dark:text-amber-400 block mb-0.5">📝 Ghi chú bài viết:</span>
                         <p className="text-gray-700 dark:text-slate-300 italic">{contentText || 'Ghi chú thêm từ tác giả'}</p>
+                      </div>
+                    );
+                  }
+
+                  if (jsonChecklist) {
+                    return (
+                      <div key={item.id} className="p-3.5 rounded-xl border border-purple-200/80 dark:border-purple-900/50 bg-purple-50/40 dark:bg-purple-950/20 text-xs space-y-2">
+                        <div className="flex items-center gap-2 font-bold text-sm text-purple-800 dark:text-purple-300">
+                          <CheckSquare size={16} className="text-purple-600 shrink-0" />
+                          <span>{jsonChecklist.title || 'Danh sách công việc'}</span>
+                        </div>
+                        {Array.isArray(jsonChecklist.items) && jsonChecklist.items.length > 0 && (
+                          <div className="space-y-1.5 pl-6 pt-1 border-t border-purple-100 dark:border-purple-900/30">
+                            {jsonChecklist.items.map((chk: any, idx: number) => (
+                              <div key={idx} className="flex items-center gap-2 text-gray-700 dark:text-slate-300">
+                                {chk.done ? (
+                                  <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                                ) : (
+                                  <Circle size={14} className="text-gray-400 shrink-0" />
+                                )}
+                                <span className={chk.done ? 'line-through text-gray-400 font-normal' : 'font-medium'}>
+                                  {chk.text}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   }
@@ -2784,7 +2827,7 @@ export default function ItinerariesPage() {
                     <div className="space-y-3">
                       {selectedPlaceItem.place.reviews.map((rev: any, rIdx: number) => {
                         const authorName = rev.authorName || rev.user?.fullName || 'Người dùng CloudMood';
-                        const authorAvatar = rev.authorAvatar || rev.user?.avatar || '/default-avatar.jpg';
+                        const authorAvatar = rev.authorAvatar || rev.user?.avatar || '/default-avatar.svg';
                         const revDate = rev.publishedDate ? new Date(rev.publishedDate).toLocaleDateString('vi-VN') : null;
                         const ratingVal = Number(rev.rating) || 5;
 

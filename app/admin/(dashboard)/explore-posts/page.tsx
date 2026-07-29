@@ -15,7 +15,10 @@ import {
   Sparkles,
   Layers,
   MapPin,
-  ExternalLink
+  ExternalLink,
+  CheckSquare,
+  CheckCircle2,
+  Circle
 } from 'lucide-react';
 
 interface ExplorePost {
@@ -380,12 +383,51 @@ export default function ExplorePostsPage() {
               <p className="text-sm text-gray-600 dark:text-slate-300 leading-relaxed">{selectedPost.description}</p>
               <h4 className="text-xs font-bold text-gray-400 uppercase">Mục nội dung bài viết ({selectedPost.items?.length || 0})</h4>
               <div className="space-y-2.5">
-                {selectedPost.items?.map((item: any) => (
-                  <div key={item.id} className="p-3.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-950 text-xs">
-                    <span className="font-bold text-blue-600 block mb-1">Loại: {item.itemType}</span>
-                    <p className="text-gray-800 dark:text-slate-200">{item.content || item.place?.name || 'Mục hình ảnh/địa điểm'}</p>
-                  </div>
-                ))}
+                {selectedPost.items?.map((item: any) => {
+                  let jsonChecklist: any = null;
+                  if (item.content && typeof item.content === 'string' && item.content.trim().startsWith('{')) {
+                    try {
+                      const parsed = JSON.parse(item.content);
+                      if (parsed && (parsed.title || Array.isArray(parsed.items))) {
+                        jsonChecklist = parsed;
+                      }
+                    } catch (e) {}
+                  }
+
+                  if (jsonChecklist) {
+                    return (
+                      <div key={item.id} className="p-3.5 rounded-xl border border-purple-200/80 dark:border-purple-900/50 bg-purple-50/40 dark:bg-purple-950/20 text-xs space-y-2">
+                        <div className="flex items-center gap-2 font-bold text-sm text-purple-800 dark:text-purple-300">
+                          <CheckSquare size={16} className="text-purple-600 shrink-0" />
+                          <span>{jsonChecklist.title || 'Danh sách công việc'}</span>
+                        </div>
+                        {Array.isArray(jsonChecklist.items) && jsonChecklist.items.length > 0 && (
+                          <div className="space-y-1.5 pl-6 pt-1 border-t border-purple-100 dark:border-purple-900/30">
+                            {jsonChecklist.items.map((chk: any, idx: number) => (
+                              <div key={idx} className="flex items-center gap-2 text-gray-700 dark:text-slate-300">
+                                {chk.done ? (
+                                  <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                                ) : (
+                                  <Circle size={14} className="text-gray-400 shrink-0" />
+                                )}
+                                <span className={chk.done ? 'line-through text-gray-400 font-normal' : 'font-medium'}>
+                                  {chk.text}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={item.id} className="p-3.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-950 text-xs">
+                      <span className="font-bold text-blue-600 block mb-1">Loại: {item.itemType}</span>
+                      <p className="text-gray-800 dark:text-slate-200">{item.content || item.place?.name || 'Mục hình ảnh/địa điểm'}</p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

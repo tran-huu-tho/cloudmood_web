@@ -169,9 +169,9 @@ export default function UsersPage() {
   };
 
   const getAvatarUrl = (avatarUrl: string | null) => {
-    if (!avatarUrl) return '/default-avatar.jpg';
-    if (avatarUrl.includes('photo-1534528741775-53994a69daeb')) {
-      return '/default-avatar.jpg';
+    if (!avatarUrl) return '/default-avatar.svg';
+    if (avatarUrl.includes('photo-1534528741775-53994a69daeb') || avatarUrl.includes('default-avatar.jpg')) {
+      return '/default-avatar.svg';
     }
     return avatarUrl;
   };
