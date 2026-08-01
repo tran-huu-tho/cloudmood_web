@@ -60,7 +60,7 @@ export default function DashboardLayout({
       {showButton && (
         <button
           onClick={() => setIsAIChatOpen(prev => !prev)}
-          className="fixed bottom-14 right-14 w-16 h-16 bg-gradient-to-tr from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 hover:scale-105 active:scale-95 rounded-full flex items-center justify-center shadow-xl hover:shadow-2xl transition-all z-[9998] cursor-pointer border border-white/10 p-1.5"
+          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 hover:scale-105 active:scale-95 rounded-full flex items-center justify-center shadow-xl hover:shadow-2xl transition-all z-[9998] cursor-pointer border border-white/10 p-1.5"
           title="Trợ lý AI CloudBros"
         >
           <img src="/logo-xoanen-cloudmood.png" alt="AI CloudBros" className="w-full h-full object-contain" />

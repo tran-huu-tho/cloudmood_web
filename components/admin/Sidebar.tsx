@@ -48,30 +48,30 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
       {/* Sidebar Container */}
       <aside className={`
-        fixed lg:static top-0 left-0 h-screen w-80 bg-white dark:bg-slate-900 text-gray-600 min-h-screen flex flex-col border-r border-gray-200 dark:border-slate-800 shrink-0 z-[9995] lg:z-auto transition-transform duration-300 ease-out
+        fixed lg:static top-0 left-0 h-screen w-64 bg-white dark:bg-slate-900 text-gray-600 min-h-screen flex flex-col border-r border-gray-200 dark:border-slate-800 shrink-0 z-[9995] lg:z-auto transition-transform duration-300 ease-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         {/* Logo Area */}
-        <div className="h-20 flex items-center justify-between px-8 border-b border-gray-200 dark:border-slate-800 shrink-0">
+        <div className="h-16 flex items-center justify-between px-6 border-b border-gray-200 dark:border-slate-800 shrink-0">
           <div className="flex items-center">
-            <div className="w-12 h-12 rounded overflow-hidden flex items-center justify-center mr-4 shrink-0">
+            <div className="w-9 h-9 rounded overflow-hidden flex items-center justify-center mr-3 shrink-0">
               <Image 
                 src="/logo-cloudmood.png" 
                 alt="CloudMood Icon" 
-                width={48} 
-                height={48}
+                width={36} 
+                height={36}
                 className="object-cover w-full h-full"
                 priority
               />
             </div>
-            <span className="text-gray-900 dark:text-slate-100 font-bold text-2xl tracking-wide">CloudMood</span>
+            <span className="text-gray-900 dark:text-slate-100 font-bold text-xl tracking-tight">CloudMood</span>
           </div>
 
           {/* Close button inside drawer for mobile */}
           {onClose && (
             <button 
               onClick={onClose}
-              className="lg:hidden p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 border border-transparent hover:border-slate-200/60 cursor-pointer"
+              className="lg:hidden p-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 border border-transparent hover:border-slate-200/60 cursor-pointer"
             >
               <X size={18} />
             </button>
@@ -79,7 +79,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-8 px-6 space-y-4 overflow-y-auto">
+        <nav className="flex-1 py-5 px-4 space-y-2 overflow-y-auto">
           {navItems.map((item) => {
             const isActive = pathname === item.path;
             return (
@@ -87,13 +87,13 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                 key={item.path}
                 href={item.path}
                 onClick={onClose} // Auto-close drawer on link click on mobile
-                className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${isActive
-                    ? 'bg-blue-50 text-blue-600'
-                    : 'hover:bg-gray-100 hover:text-gray-900'
+                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-colors ${isActive
+                    ? 'bg-blue-50 text-blue-600 font-bold'
+                    : 'hover:bg-gray-100 hover:text-gray-900 font-medium'
                   }`}
               >
-                <item.icon size={22} className={isActive ? "text-blue-600" : "text-gray-500"} />
-                <span className="text-base font-semibold">{item.name}</span>
+                <item.icon size={20} className={isActive ? "text-blue-600" : "text-gray-500"} />
+                <span className="text-sm">{item.name}</span>
               </Link>
             );
           })}

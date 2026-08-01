@@ -55,7 +55,7 @@ const formatTimeToHHMM = (timeString: any) => {
 const displayOpeningHours = (place: any) => {
   const open = formatTimeToHHMM(place.openTime);
   const close = formatTimeToHHMM(place.closeTime);
-  
+
   if (open && close) {
     return `${open} - ${close}`;
   }
@@ -71,11 +71,11 @@ const displayOpeningHours = (place: any) => {
       if (hours && typeof hours === 'object') {
         const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
         const currentDay = days[new Date().getDay()];
-        
+
         if (hours[currentDay] && Array.isArray(hours[currentDay]) && hours[currentDay].length >= 2) {
           return `${hours[currentDay][0]} - ${hours[currentDay][1]}`;
         }
-        
+
         for (const day of days) {
           if (hours[day] && Array.isArray(hours[day]) && hours[day].length >= 2) {
             return `${hours[day][0]} - ${hours[day][1]}`;
@@ -345,7 +345,7 @@ export default function LocationsPage() {
       const res = await fetch(`/api/admin/places/${placeId}`);
       if (!res.ok) throw new Error('Không thể tải chi tiết địa điểm.');
       const data = await res.json();
-      
+
       setPlaceReviews(data.reviews || []);
       setPlacePhotos(data.photos || []);
     } catch (err: any) {
@@ -402,7 +402,7 @@ export default function LocationsPage() {
         console.error(e);
       }
     }
-    
+
     // Fallback if openingHours is not set or invalid
     if (!parsedOpeningHours || typeof parsedOpeningHours !== 'object') {
       const defaultTime = [place.openTime || '07:00', place.closeTime || '23:00'];
@@ -437,7 +437,7 @@ export default function LocationsPage() {
     setReviewError(null);
     setNewPhoto({ urlOriginal: '', urlThumbnail: '', caption: '' });
     setIsModalOpen(true);
-    
+
     fetchReviewsAndPhotos(Number(place.id));
   };
 
@@ -481,7 +481,7 @@ export default function LocationsPage() {
     setReviewError(null);
     setNewPhoto({ urlOriginal: '', urlThumbnail: '', caption: '' });
     setIsModalOpen(true);
-    
+
     fetchReviewsAndPhotos(Number(place.id));
   };
 
@@ -525,7 +525,7 @@ export default function LocationsPage() {
     setReviewError(null);
     setNewPhoto({ urlOriginal: '', urlThumbnail: '', caption: '' });
     setIsModalOpen(true);
-    
+
     fetchReviewsAndPhotos(Number(place.id));
   };
 
@@ -634,7 +634,7 @@ export default function LocationsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Lỗi khi xóa đánh giá.');
-      
+
       setPlaceReviews((prev) => prev.filter((r) => Number(r.id) !== reviewId));
       fetchData();
       showToast('Xóa đánh giá thành công!', 'success');
@@ -650,7 +650,7 @@ export default function LocationsPage() {
       setReviewError('Vui lòng nhập đầy đủ tên người đánh giá và nhận xét.');
       return;
     }
-    
+
     const avatarUrl = newReview.authorAvatar.trim() || null;
 
     if (modalType === 'create' || !currentPlace.id) {
@@ -682,7 +682,7 @@ export default function LocationsPage() {
         source: 'TRIPADVISOR',
         authorAvatar: avatarUrl,
       };
-      
+
       const res = await fetch(`/api/admin/places/${currentPlace.id}/reviews`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -690,7 +690,7 @@ export default function LocationsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Lỗi khi thêm đánh giá.');
-      
+
       setPlaceReviews((prev) => [data, ...prev]);
       setNewReview({ authorName: '', authorAvatar: '', rating: 5, comment: '', publishedDate: '', authorLocation: '' });
       setReviewError(null);
@@ -713,7 +713,7 @@ export default function LocationsPage() {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Lỗi khi xóa ảnh.');
-      
+
       setPlacePhotos((prev) => prev.filter((p) => Number(p.id) !== photoId));
       showToast('Xóa hình ảnh thành công!', 'success');
     } catch (err: any) {
@@ -733,7 +733,7 @@ export default function LocationsPage() {
       setPhotoError('Link dạng blob:... chỉ tồn tại tạm thời trong tab Zalo. Vui lòng sử dụng nút "Chọn ảnh từ máy" hoặc dán Link URL web trực tiếp (https://...).');
       return;
     }
-    
+
     if (modalType === 'create' || !currentPlace.id) {
       const mockPhoto = {
         id: Date.now(),
@@ -756,7 +756,7 @@ export default function LocationsPage() {
         caption: newPhoto.caption.trim() || null,
         source: 'LOCAL',
       };
-      
+
       const res = await fetch(`/api/admin/places/${currentPlace.id}/photos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -764,7 +764,7 @@ export default function LocationsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Lỗi khi thêm hình ảnh.');
-      
+
       setPlacePhotos((prev) => [data, ...prev]);
       setNewPhoto({ urlOriginal: '', urlThumbnail: '', caption: '' });
       setPhotoError(null);
@@ -935,7 +935,7 @@ export default function LocationsPage() {
         } else if (file.name.endsWith('.csv')) {
           const lines = content.split('\n').map(line => line.trim()).filter(Boolean);
           if (lines.length <= 1) throw new Error('File CSV không có dữ liệu.');
-          
+
           const headers = parseCSVLine(lines[0]);
           for (let i = 1; i < lines.length; i++) {
             const values = parseCSVLine(lines[i]);
@@ -1157,7 +1157,7 @@ export default function LocationsPage() {
             const parsed = JSON.parse(p.subCategories);
             if (Array.isArray(parsed)) return parsed;
           }
-        } catch {}
+        } catch { }
         return [];
       })
     )
@@ -1170,13 +1170,13 @@ export default function LocationsPage() {
     const matchesCategory =
       selectedCategoryFilter === 'all' || p.categoryId === Number(selectedCategoryFilter);
 
-    const subCats = Array.isArray(p.subCategories) 
-      ? p.subCategories 
+    const subCats = Array.isArray(p.subCategories)
+      ? p.subCategories
       : p.subCategories && typeof p.subCategories === 'string'
         ? JSON.parse(p.subCategories)
         : [];
-    const matchesSubCategory = 
-      selectedSubCategoryFilter === 'all' || 
+    const matchesSubCategory =
+      selectedSubCategoryFilter === 'all' ||
       (Array.isArray(subCats) && subCats.includes(selectedSubCategoryFilter));
 
     const matchesApproval =
@@ -1212,9 +1212,8 @@ export default function LocationsPage() {
     <div className="space-y-6">
       {/* Toast Notification */}
       {toast.show && (
-        <div className={`fixed top-24 right-6 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-[9999] animate-in fade-in slide-in-from-top-4 duration-200 ${
-          toast.type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'
-        }`}>
+        <div className={`fixed top-24 right-6 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-[9999] animate-in fade-in slide-in-from-top-4 duration-200 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'
+          }`}>
           {toast.type === 'success' ? <Check size={20} className="shrink-0" /> : <X size={20} className="shrink-0" />}
           <span className="text-base font-semibold">{toast.message}</span>
         </div>
@@ -1343,150 +1342,147 @@ export default function LocationsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="text-gray-500 bg-gray-50 border-b border-gray-200 font-semibold uppercase tracking-wider">
-                  <th className="px-6 py-4">Địa điểm</th>
-                  <th className="px-6 py-4">Danh mục</th>
-                  <th className="px-6 py-4">Đánh giá</th>
-                  <th className="px-6 py-4">Địa chỉ & Tọa độ</th>
-                  <th className="px-6 py-4">Mức giá & Giờ mở</th>
-                  <th className="px-6 py-4">Trạng thái</th>
-                  <th className="px-6 py-4 text-right">Thao tác</th>
+                <tr className="text-gray-500 bg-gray-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 text-[11px] font-bold uppercase tracking-wider sticky top-0 z-10 shadow-2xs">
+                  <th className="px-2.5 py-2.5">Địa điểm</th>
+                  <th className="px-2 py-2.5">Danh mục</th>
+                  <th className="px-2 py-2.5">Đánh giá</th>
+                  <th className="px-2.5 py-2.5">Địa chỉ & Tọa độ</th>
+                  <th className="px-2 py-2.5">Mức giá & Giờ mở</th>
+                  <th className="px-2 py-2.5">Trạng thái</th>
+                  <th className="px-2.5 py-2.5 text-right">Thao tác</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                 {paginatedPlaces.map((place) => {
                   const cat = categories.find((c) => c.id === place.categoryId);
                   const catName = cat?.name || 'Chưa phân loại';
                   const IconComponent = cat ? getCategoryIcon(cat.iconCode) : null;
                   return (
-                    <tr key={place.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-6 py-4 max-w-sm">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 shrink-0 border border-gray-200">
+                    <tr key={place.id} className="hover:bg-gray-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                      <td className="px-2.5 py-2.5 max-w-[170px]">
+                        <div className="flex items-center gap-2">
+                          <div className="w-9 h-9 rounded-lg overflow-hidden bg-gray-100 dark:bg-slate-800 shrink-0 border border-gray-200 dark:border-slate-700">
                             {place.image ? (
                               <img src={place.image} alt={place.name || ''} className="object-cover w-full h-full" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                <MapPin size={18} />
+                                <MapPin size={15} />
                               </div>
                             )}
                           </div>
                           <div className="min-w-0">
-                            <h3 className="font-bold text-gray-900 text-sm truncate">{place.name}</h3>
-                            <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{place.description}</p>
+                            <h3 className="font-bold text-gray-900 dark:text-slate-100 text-xs truncate" title={place.name || ''}>{place.name}</h3>
+                            <p className="text-[10px] text-gray-500 dark:text-slate-400 line-clamp-1 mt-0.5">{place.description}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border ${getCategoryBadgeStyle(place.categoryId || 0)}`}>
-                          {IconComponent && <IconComponent size={12} className="shrink-0" />}
+                      <td className="px-2 py-2.5">
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${getCategoryBadgeStyle(place.categoryId || 0)}`}>
+                          {IconComponent && <IconComponent size={11} className="shrink-0" />}
                           {catName}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col gap-1">
+                      <td className="px-2 py-2.5">
+                        <div className="flex flex-col gap-0.5 whitespace-nowrap">
                           <div className="flex items-center gap-1">
-                            <Star size={14} className="fill-amber-400 text-amber-400 shrink-0" />
-                            <span className="font-bold text-gray-900 text-xs">
+                            <Star size={12} className="fill-amber-400 text-amber-400 shrink-0" />
+                            <span className="font-bold text-gray-900 dark:text-slate-100 text-xs">
                               {place.rating != null && place.rating > 0 ? Number(place.rating).toFixed(1) : 'Chưa có'}
                             </span>
                           </div>
-                          <span className="text-[11px] text-gray-500 font-medium">
+                          <span className="text-[10px] text-gray-500 dark:text-slate-400 font-medium">
                             {(place.userRatingCount ?? place._count?.reviews ?? 0).toLocaleString('vi-VN')} đánh giá
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 max-w-xs">
-                        <p className="text-gray-900 text-xs truncate">{cleanAddress(place.address)}</p>
-                        <div className="flex items-center gap-1.5 text-gray-500 text-[10px] mt-1 font-mono">
-                          <span>Lat: {place.latitude}</span>
-                          <span>&bull;</span>
-                          <span>Lng: {place.longitude}</span>
-                        </div>
+                      <td className="px-2.5 py-2.5 max-w-[170px]">
+                        <p className="text-gray-900 dark:text-slate-200 text-xs truncate" title={cleanAddress(place.address)}>{cleanAddress(place.address)}</p>
+                        <p className="text-gray-400 text-[10px] mt-0.5 font-mono truncate" title={`Lat: ${place.latitude}, Lng: ${place.longitude}`}>
+                          Lat: {place.latitude} &bull; Lng: {place.longitude}
+                        </p>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="mb-1">
-                          <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg border ${
-                            place.priceLevel === 'FREE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                      <td className="px-2 py-2.5">
+                        <div className="mb-0.5">
+                          <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md border whitespace-nowrap ${place.priceLevel === 'FREE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                             (place.priceLevel === '$' || place.priceLevel === 'INEXPENSIVE' || place.priceLevel === 'CHEAP') ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                            (place.priceLevel === '$$' || place.priceLevel === 'MODERATE') ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                            place.priceLevel === '$$$' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                            place.priceLevel === '$$ - $$$$' ? 'bg-amber-50 text-amber-800 border-amber-200' :
-                            (place.priceLevel === '$$$$' || place.priceLevel === 'VERY_EXPENSIVE' || place.priceLevel === 'EXPENSIVE') ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                            'bg-gray-50 text-gray-700 border-gray-200'
-                          }`}>
+                              (place.priceLevel === '$$' || place.priceLevel === 'MODERATE') ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                                place.priceLevel === '$$$' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                  place.priceLevel === '$$ - $$$$' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                                    (place.priceLevel === '$$$$' || place.priceLevel === 'VERY_EXPENSIVE' || place.priceLevel === 'EXPENSIVE') ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                                      'bg-gray-50 text-gray-700 border-gray-200'
+                            }`}>
                             {place.priceLevel === 'FREE' ? 'Miễn phí (FREE)' :
-                             (place.priceLevel === '$' || place.priceLevel === 'INEXPENSIVE' || place.priceLevel === 'CHEAP') ? 'Giá rẻ ($)' :
-                             place.priceLevel === '$$' ? 'Vừa phải ($$)' :
-                             place.priceLevel === 'MODERATE' ? 'Trung bình (MODERATE)' :
-                             place.priceLevel === '$$$' ? 'Cao cấp ($$$)' :
-                             place.priceLevel === '$$ - $$$$' ? 'Tầm trung - cao cấp ($$ - $$$$)' :
-                             (place.priceLevel === '$$$$' || place.priceLevel === 'VERY_EXPENSIVE' || place.priceLevel === 'EXPENSIVE') ? 'Rất cao cấp ($$$$)' : (place.priceLevel || 'MODERATE')}
+                              (place.priceLevel === '$' || place.priceLevel === 'INEXPENSIVE' || place.priceLevel === 'CHEAP') ? 'Giá rẻ ($)' :
+                                place.priceLevel === '$$' ? 'Vừa phải ($$)' :
+                                  place.priceLevel === 'MODERATE' ? 'Trung bình (MODERATE)' :
+                                    place.priceLevel === '$$$' ? 'Cao cấp ($$$)' :
+                                      place.priceLevel === '$$ - $$$$' ? 'Tầm trung - cao cấp ($$ - $$$$)' :
+                                        (place.priceLevel === '$$$$' || place.priceLevel === 'VERY_EXPENSIVE' || place.priceLevel === 'EXPENSIVE') ? 'Rất cao cấp ($$$$)' : (place.priceLevel || 'MODERATE')}
                           </span>
                         </div>
-                        <p className="text-gray-500 text-[10px] mt-1">
+                        <p className="text-gray-500 dark:text-slate-400 text-[10px] mt-0.5 whitespace-nowrap">
                           ⏱️ {displayOpeningHours(place)}
                         </p>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-2 py-2.5">
                         {place.isApproved === true ? (
                           <button
                             type="button"
                             onClick={() => handleToggleApprove(Number(place.id), place.isApproved)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-all cursor-pointer shadow-2xs hover:scale-105"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
                             title="Click để Ẩn địa điểm khỏi App Mobile"
                           >
-                            <Eye size={13} />
+                            <Eye size={11} />
                             Đã duyệt
                           </button>
                         ) : place.isApproved === false ? (
                           <button
                             type="button"
                             onClick={() => handleToggleApprove(Number(place.id), place.isApproved)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 transition-all cursor-pointer shadow-2xs hover:scale-105"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
                             title="Click để Mở ẩn & Duyệt địa điểm"
                           >
-                            <EyeOff size={13} />
+                            <EyeOff size={11} />
                             Đã ẩn
                           </button>
                         ) : (
                           <button
                             type="button"
                             onClick={() => handleToggleApprove(Number(place.id), place.isApproved)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-all cursor-pointer shadow-2xs hover:scale-105"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
                             title="Click để Duyệt địa điểm này"
                           >
-                            <Check size={13} />
+                            <Check size={11} />
                             Chờ duyệt
                           </button>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-right space-x-1 shrink-0">
+                      <td className="px-2.5 py-2.5 text-right whitespace-nowrap space-x-0.5 shrink-0">
                         {place.isApproved === null && (
                           <button
                             onClick={() => handleToggleApprove(Number(place.id), place.isApproved)}
-                            className="p-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
+                            className="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
                             title="Duyệt địa điểm"
                           >
-                            <Check size={16} />
+                            <Check size={15} />
                           </button>
                         )}
                         {place.isApproved === true && (
                           <button
                             onClick={() => handleToggleApprove(Number(place.id), place.isApproved)}
-                            className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
+                            className="p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
                             title="Ẩn địa điểm khỏi App Mobile"
                           >
-                            <Eye size={16} />
+                            <Eye size={15} />
                           </button>
                         )}
                         {place.isApproved === false && (
                           <button
                             onClick={() => handleToggleApprove(Number(place.id), place.isApproved)}
-                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer inline-flex items-center"
+                            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer inline-flex items-center"
                             title="Mở ẩn & Duyệt địa điểm"
                           >
-                            <EyeOff size={16} />
+                            <EyeOff size={15} />
                           </button>
                         )}
                         {Boolean(place.name || (place.latitude && place.longitude)) && (
@@ -1494,45 +1490,45 @@ export default function LocationsPage() {
                             href={
                               place.name
                                 ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                                    `${place.name}${place.address ? ', ' + cleanAddress(place.address) : ''}`
-                                  )}`
+                                  `${place.name}${place.address ? ', ' + cleanAddress(place.address) : ''}`
+                                )}`
                                 : `https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}`
                             }
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="p-2 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
+                            className="p-1.5 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
                             title={`Xem "${place.name}" trên Google Maps`}
                           >
-                            <ExternalLink size={16} />
+                            <ExternalLink size={15} />
                           </a>
                         )}
-                         <button
+                        <button
                           onClick={() => handleOpenEdit(place)}
-                          className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
+                          className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
                           title="Sửa thông tin"
                         >
-                          <Edit2 size={16} />
+                          <Edit2 size={15} />
                         </button>
                         <button
                           onClick={() => handleOpenReviews(place)}
-                          className="p-2 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer inline-flex items-center relative"
+                          className="p-1.5 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer inline-flex items-center relative"
                           title="Quản lý Đánh giá"
                         >
-                          <MessageSquare size={16} />
+                          <MessageSquare size={15} />
                         </button>
                         <button
                           onClick={() => handleOpenPhotos(place)}
-                          className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
+                          className="p-1.5 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
                           title="Quản lý Hình ảnh"
                         >
-                          <ImageIcon size={16} />
+                          <ImageIcon size={15} />
                         </button>
                         <button
                           onClick={() => handleOpenDelete(place.id)}
-                          className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
+                          className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
                           title="Xóa"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={15} />
                         </button>
                       </td>
                     </tr>
@@ -1561,11 +1557,10 @@ export default function LocationsPage() {
                 <button
                   key={page}
                   onClick={() => setCurrentPage(page)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                    currentPage === page
-                      ? 'bg-blue-600 text-white'
-                      : 'border border-gray-200 text-gray-700 bg-white hover:bg-gray-50'
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${currentPage === page
+                    ? 'bg-blue-600 text-white'
+                    : 'border border-gray-200 text-gray-700 bg-white hover:bg-gray-50'
+                    }`}
                 >
                   {page}
                 </button>
@@ -1592,7 +1587,7 @@ export default function LocationsPage() {
                 <Info size={20} className="text-blue-600" />
                 <h3 className="text-lg font-bold text-gray-900">Hướng dẫn định dạng file Import Địa điểm</h3>
               </div>
-              <button 
+              <button
                 onClick={() => setShowImportHelp(false)}
                 className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1.5 rounded-lg transition-colors cursor-pointer"
               >
@@ -1677,7 +1672,7 @@ export default function LocationsPage() {
               <div>
                 <p className="font-bold text-gray-900 mb-2">2. Ví dụ file CSV chuẩn (.csv):</p>
                 <pre className="bg-gray-900 text-gray-100 p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed border border-gray-800">
-{`name,address,categoryName,latitude,longitude,phone,website,priceLevel,rating,userRatingCount,subCategories,photos,openTime,closeTime
+                  {`name,address,categoryName,latitude,longitude,phone,website,priceLevel,rating,userRatingCount,subCategories,photos,openTime,closeTime
 Yaki House Buffet,123 Đường 3/2 Cần Thơ,Quán ăn,10.035425,105.779507,02923890123,https://yakihouse.vn,$$ - $$$$,4.5,120,"Buffet, Lẩu nướng","https://example.com/photo1.jpg, https://example.com/photo2.jpg",08:00,22:00
 Lúa Nếp Restaurant,Khu bãi bồi Ninh Kiều Cần Thơ,Quán ăn,10.029810,105.789120,02923888999,https://luanep.vn,MODERATE,4.8,210,"Đặc sản miền Tây, Sân vườn","https://example.com/photo3.jpg",07:00,23:00`}
                 </pre>
@@ -1686,7 +1681,7 @@ Lúa Nếp Restaurant,Khu bãi bồi Ninh Kiều Cần Thơ,Quán ăn,10.029810,
               <div>
                 <p className="font-bold text-gray-900 mb-2">3. Ví dụ file JSON tổng hợp chứa cả Ảnh &amp; Đánh giá (.json):</p>
                 <pre className="bg-gray-900 text-gray-100 p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed border border-gray-800">
-{`[
+                  {`[
   {
     "name": "Yaki House Buffet",
     "address": "123 Đường 3/2, Ninh Kiều, Cần Thơ",
@@ -1738,7 +1733,7 @@ Lúa Nếp Restaurant,Khu bãi bồi Ninh Kiều Cần Thơ,Quán ăn,10.029810,
                 <Info size={20} className="text-amber-600" />
                 <h3 className="text-lg font-bold text-gray-900">Hướng dẫn định dạng file Import Đánh giá</h3>
               </div>
-              <button 
+              <button
                 onClick={() => setShowReviewsImportHelp(false)}
                 className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1.5 rounded-lg transition-colors cursor-pointer"
               >
@@ -1797,7 +1792,7 @@ Lúa Nếp Restaurant,Khu bãi bồi Ninh Kiều Cần Thơ,Quán ăn,10.029810,
               <div>
                 <p className="font-bold text-gray-900 mb-2">2. Ví dụ file CSV chuẩn (.csv):</p>
                 <pre className="bg-gray-900 text-amber-100 p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed border border-gray-800">
-{`authorName,rating,comment,authorAvatar,authorLocation,source
+                  {`authorName,rating,comment,authorAvatar,authorLocation,source
 Nguyễn Văn A,5,"Món ăn tuyệt vời!",https://example.com/avatar.jpg,Hà Nội,TRIPADVISOR
 Trần Thị B,4,"Dịch vụ chu đáo",,TP.HCM,LOCAL`}
                 </pre>
@@ -1806,7 +1801,7 @@ Trần Thị B,4,"Dịch vụ chu đáo",,TP.HCM,LOCAL`}
               <div>
                 <p className="font-bold text-gray-900 mb-2">3. Ví dụ file JSON chuẩn (.json):</p>
                 <pre className="bg-gray-900 text-amber-100 p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed border border-gray-800">
-{`[
+                  {`[
   {
     "authorName": "Nguyễn Văn A",
     "authorAvatar": "https://example.com/avatar.jpg",
@@ -1843,7 +1838,7 @@ Trần Thị B,4,"Dịch vụ chu đáo",,TP.HCM,LOCAL`}
                 <Info size={20} className="text-purple-600" />
                 <h3 className="text-lg font-bold text-gray-900">Hướng dẫn định dạng file Import Hình ảnh</h3>
               </div>
-              <button 
+              <button
                 onClick={() => setShowPhotosImportHelp(false)}
                 className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1.5 rounded-lg transition-colors cursor-pointer"
               >
@@ -1882,7 +1877,7 @@ Trần Thị B,4,"Dịch vụ chu đáo",,TP.HCM,LOCAL`}
               <div>
                 <p className="font-bold text-gray-900 mb-2">2. Ví dụ file CSV chuẩn (.csv):</p>
                 <pre className="bg-gray-900 text-purple-100 p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed border border-gray-800">
-{`urlOriginal,caption
+                  {`urlOriginal,caption
 https://res.cloudinary.com/demo/image/upload/photo1.jpg,Không gian tầng 1
 https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                 </pre>
@@ -1891,7 +1886,7 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
               <div>
                 <p className="font-bold text-gray-900 mb-2">3. Ví dụ file JSON chuẩn (.json):</p>
                 <pre className="bg-gray-900 text-purple-100 p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed border border-gray-800">
-{`[
+                  {`[
   {
     "urlOriginal": "https://res.cloudinary.com/demo/image/upload/photo1.jpg",
     "caption": "Không gian tầng 1"
@@ -1917,87 +1912,83 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
 
       {/* Add / Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs overflow-hidden">
-          <div className="bg-white rounded-2xl w-[98vw] max-w-[1780px] h-[94vh] max-h-[960px] shadow-2xl overflow-hidden border border-gray-200 flex flex-col my-auto">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-2 sm:p-3 backdrop-blur-xs overflow-hidden">
+          <div className="bg-white rounded-xl w-[96vw] max-w-[1480px] max-h-[96vh] shadow-2xl overflow-hidden border border-gray-200 flex flex-col my-auto">
             {/* Modal Header */}
-            <div className="flex justify-between items-center px-8 py-4 border-b border-gray-200 bg-gray-50/90 shrink-0">
-              <h3 className="font-extrabold text-gray-900 text-xl tracking-tight">
+            <div className="flex justify-between items-center px-5 py-2.5 border-b border-gray-200 bg-gray-50/90 shrink-0">
+              <h3 className="font-extrabold text-gray-900 text-base sm:text-lg tracking-tight">
                 {modalType === 'create'
                   ? 'Thêm địa điểm mới'
                   : `Chỉnh sửa địa điểm: ${currentPlace.name || ''}`}
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200/60 rounded-xl transition-colors cursor-pointer">
-                <X size={22} />
+              <button onClick={() => setIsModalOpen(false)} className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-200/60 rounded-md transition-colors cursor-pointer">
+                <X size={20} />
               </button>
             </div>
 
             {/* 4-Tab Switcher Bar */}
-            <div className="flex border-b border-gray-200 bg-gray-50/80 px-6 pt-2 shrink-0 overflow-x-auto">
+            <div className="flex border-b border-gray-200 bg-gray-50/80 px-4 pt-1.5 shrink-0 overflow-x-auto">
               <button
                 type="button"
                 onClick={() => setActiveTab('basic')}
-                className={`flex items-center gap-2.5 px-6 py-3.5 text-sm font-bold rounded-t-xl transition-all cursor-pointer border-t border-x shrink-0 ${
-                  activeTab === 'basic'
-                    ? 'bg-white border-gray-250 text-blue-600 shadow-2xs -mb-px text-base'
-                    : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/80'
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold rounded-t-lg transition-all cursor-pointer border-t border-x shrink-0 ${activeTab === 'basic'
+                  ? 'bg-white border-gray-250 text-blue-600 shadow-2xs -mb-px'
+                  : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/80'
+                  }`}
               >
-                <Info size={18} />
+                <Info size={16} />
                 1. Thông tin cơ bản &amp; Vị trí
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('extra')}
-                className={`flex items-center gap-2.5 px-6 py-3.5 text-sm font-bold rounded-t-xl transition-all cursor-pointer border-t border-x shrink-0 ${
-                  activeTab === 'extra'
-                    ? 'bg-white border-gray-250 text-blue-600 shadow-2xs -mb-px text-base'
-                    : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/80'
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold rounded-t-lg transition-all cursor-pointer border-t border-x shrink-0 ${activeTab === 'extra'
+                  ? 'bg-white border-gray-250 text-blue-600 shadow-2xs -mb-px'
+                  : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/80'
+                  }`}
               >
-                <Clock size={18} />
+                <Clock size={16} />
                 2. Danh mục phụ &amp; Giờ hoạt động
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('reviews')}
-                className={`flex items-center gap-2.5 px-6 py-3.5 text-sm font-bold rounded-t-xl transition-all cursor-pointer border-t border-x shrink-0 ${
-                  activeTab === 'reviews'
-                    ? 'bg-white border-gray-250 text-amber-600 shadow-2xs -mb-px text-base'
-                    : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/80'
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold rounded-t-lg transition-all cursor-pointer border-t border-x shrink-0 ${activeTab === 'reviews'
+                  ? 'bg-white border-gray-250 text-amber-600 shadow-2xs -mb-px'
+                  : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/80'
+                  }`}
               >
-                <MessageSquare size={18} />
+                <MessageSquare size={16} />
                 3. Quản lý Đánh giá {placeReviews.length > 0 && `(${placeReviews.length})`}
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('photos')}
-                className={`flex items-center gap-2.5 px-6 py-3.5 text-sm font-bold rounded-t-xl transition-all cursor-pointer border-t border-x shrink-0 ${
-                  activeTab === 'photos'
-                    ? 'bg-white border-gray-250 text-purple-600 shadow-2xs -mb-px text-base'
-                    : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/80'
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold rounded-t-lg transition-all cursor-pointer border-t border-x shrink-0 ${activeTab === 'photos'
+                  ? 'bg-white border-gray-250 text-purple-600 shadow-2xs -mb-px'
+                  : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/80'
+                  }`}
               >
-                <ImageIcon size={18} />
+                <ImageIcon size={16} />
                 4. Bộ sưu tập Hình ảnh {placePhotos.length > 0 && `(${placePhotos.length})`}
               </button>
             </div>
 
             {/* TAB 1 & TAB 2 (Wrapped in Form) */}
             {(activeTab === 'basic' || activeTab === 'extra') && (
-              <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 lg:p-8 flex flex-col justify-between space-y-6">
+              <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-4 lg:p-5 flex flex-col justify-between space-y-3">
                 {modalError && (
-                  <div className="text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-xl p-4">{modalError}</div>
+                  <div className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-md p-2.5">{modalError}</div>
                 )}
 
                 <div className="flex-1">
                   {/* SUB-TAB 1: Basic Info & Map */}
                   {activeTab === 'basic' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
                       {/* Left Column: Essential Fields */}
-                      <div className="space-y-5">
-                        <div className="space-y-2">
-                          <label className="text-sm font-bold text-gray-800 block">
+                      <div className="space-y-2.5">
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-gray-700 block">
                             Tên địa điểm <span className="text-red-500">*</span>
                           </label>
                           <input
@@ -2006,19 +1997,19 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                             value={currentPlace.name || ''}
                             onChange={(e) => setCurrentPlace({ ...currentPlace, name: e.target.value })}
                             disabled={modalLoading}
-                            className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                            className="w-full text-xs text-gray-900 border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100 shadow-2xs font-medium"
                           />
                         </div>
 
-                        <div className="space-y-2">
-                          <label className="text-sm font-bold text-gray-800 block">
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-gray-700 block">
                             Danh mục <span className="text-red-500">*</span>
                           </label>
                           <select
                             value={currentPlace.categoryId || (categories[0]?.id ? Number(categories[0].id) : '')}
                             onChange={(e) => setCurrentPlace({ ...currentPlace, categoryId: Number(e.target.value) })}
                             disabled={modalLoading}
-                            className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 cursor-pointer shadow-2xs font-medium"
+                            className="w-full text-xs text-gray-900 border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100 cursor-pointer shadow-2xs font-medium"
                           >
                             {categories.map((c) => (
                               <option key={c.id} value={c.id}>
@@ -2028,20 +2019,20 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                           </select>
                         </div>
 
-                        <div className="space-y-2">
-                          <label className="text-sm font-bold text-gray-800 block">Mô tả ngắn</label>
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-gray-700 block">Mô tả ngắn</label>
                           <textarea
                             placeholder="Nhập mô tả địa điểm..."
                             value={currentPlace.description || ''}
                             onChange={(e) => setCurrentPlace({ ...currentPlace, description: e.target.value })}
                             disabled={modalLoading}
-                            rows={3}
-                            className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                            rows={2}
+                            className="w-full text-xs text-gray-900 border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100 shadow-2xs font-medium resize-none"
                           />
                         </div>
 
-                        <div className="space-y-2">
-                          <label className="text-sm font-bold text-gray-800 block">
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-gray-700 block">
                             Địa chỉ <span className="text-red-500">*</span>
                           </label>
                           <input
@@ -2050,18 +2041,18 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                             value={currentPlace.address || ''}
                             onChange={(e) => setCurrentPlace({ ...currentPlace, address: e.target.value })}
                             disabled={modalLoading}
-                            className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                            className="w-full text-xs text-gray-900 border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100 shadow-2xs font-medium"
                           />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-5">
-                          <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-800 block">Mức giá</label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-700 block">Mức giá</label>
                             <select
                               value={currentPlace.priceLevel || 'MODERATE'}
                               onChange={(e) => setCurrentPlace({ ...currentPlace, priceLevel: e.target.value })}
                               disabled={modalLoading}
-                              className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 cursor-pointer shadow-2xs font-medium"
+                              className="w-full text-xs text-gray-900 border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100 cursor-pointer shadow-2xs font-medium"
                             >
                               <option value="FREE">Miễn phí (FREE)</option>
                               <option value="$">Giá rẻ ($)</option>
@@ -2072,22 +2063,22 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                               <option value="$$$$">Rất cao cấp ($$$$)</option>
                             </select>
                           </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-800 block">Số điện thoại</label>
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-700 block">Số điện thoại</label>
                             <input
                               type="text"
                               placeholder="VD: 0292 3890..."
                               value={currentPlace.phone || ''}
                               onChange={(e) => setCurrentPlace({ ...currentPlace, phone: e.target.value })}
                               disabled={modalLoading}
-                              className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                              className="w-full text-xs text-gray-900 border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100 shadow-2xs font-medium"
                             />
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-5">
-                          <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-800 block">Đánh giá trung bình (Rating 0-5)</label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-700 block">Đánh giá trung bình (Rating 0-5)</label>
                             <input
                               type="number"
                               step="0.1"
@@ -2123,11 +2114,11 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                                 }
                               }}
                               disabled={modalLoading}
-                              className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                              className="w-full text-xs text-gray-900 border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100 shadow-2xs font-medium"
                             />
                           </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-800 block">Tổng số lượt đánh giá</label>
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-700 block">Tổng số lượt đánh giá</label>
                             <input
                               type="number"
                               min="0"
@@ -2135,70 +2126,70 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                               value={currentPlace.userRatingCount !== undefined && currentPlace.userRatingCount !== null ? currentPlace.userRatingCount : ''}
                               onChange={(e) => setCurrentPlace({ ...currentPlace, userRatingCount: e.target.value === '' ? null : parseInt(e.target.value) })}
                               disabled={modalLoading}
-                              className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                              className="w-full text-xs text-gray-900 border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100 shadow-2xs font-medium"
                             />
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-5">
-                          <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-800 block">Trang web (Website)</label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-700 block">Trang web (Website)</label>
                             <input
                               type="text"
                               placeholder="VD: https://cloudmood.com..."
                               value={currentPlace.website || ''}
                               onChange={(e) => setCurrentPlace({ ...currentPlace, website: e.target.value })}
                               disabled={modalLoading}
-                              className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                              className="w-full text-xs text-gray-900 border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100 shadow-2xs font-medium"
                             />
                           </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-800 block">Link TripAdvisor (tripadvisorUrl)</label>
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-700 block">Link TripAdvisor (tripadvisorUrl)</label>
                             <input
                               type="text"
                               placeholder="VD: https://www.tripadvisor.com/..."
                               value={currentPlace.tripadvisorUrl || ''}
                               onChange={(e) => setCurrentPlace({ ...currentPlace, tripadvisorUrl: e.target.value })}
                               disabled={modalLoading}
-                              className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                              className="w-full text-xs text-gray-900 border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100 shadow-2xs font-medium"
                             />
                           </div>
                         </div>
                       </div>
 
                       {/* Right Column: Coordinates & MapPicker */}
-                      <div className="space-y-5">
-                        <div className="grid grid-cols-2 gap-5">
-                          <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-800 block">Vĩ độ (Latitude)</label>
+                      <div className="space-y-2.5">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-700 block">Vĩ độ (Latitude)</label>
                             <input
                               type="number"
                               step="any"
                               value={currentPlace.latitude || ''}
                               onChange={(e) => setCurrentPlace({ ...currentPlace, latitude: parseFloat(e.target.value) || 0 })}
                               disabled={modalLoading}
-                              className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                              className="w-full text-xs text-gray-900 border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100 shadow-2xs font-medium"
                             />
                           </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-800 block">Kinh độ (Longitude)</label>
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-700 block">Kinh độ (Longitude)</label>
                             <input
                               type="number"
                               step="any"
                               value={currentPlace.longitude || ''}
                               onChange={(e) => setCurrentPlace({ ...currentPlace, longitude: parseFloat(e.target.value) || 0 })}
                               disabled={modalLoading}
-                              className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                              className="w-full text-xs text-gray-900 border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100 shadow-2xs font-medium"
                             />
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <label className="text-sm font-bold text-gray-800 flex items-center justify-between">
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-gray-700 flex items-center justify-between">
                             <span>Chọn vị trí trên bản đồ</span>
-                            <span className="text-xs font-medium text-gray-500">Click trên bản đồ để tự động lấy tọa độ</span>
+                            <span className="text-[11px] font-medium text-gray-500">Click trên bản đồ để tự động lấy tọa độ</span>
                           </label>
-                          <div className="w-full h-[520px] border border-gray-300 rounded-2xl overflow-hidden shadow-xs relative bg-gray-50">
+                          <div className="w-full h-[350px] border border-gray-300 rounded-lg overflow-hidden shadow-xs relative bg-gray-50">
                             <MapPicker
                               lat={Number(currentPlace.latitude) || 10.03022}
                               lng={Number(currentPlace.longitude) || 105.78753}
@@ -2212,31 +2203,31 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
 
                   {/* SUB-TAB 2: Subcategories, Opening Hours & Representative Image */}
                   {activeTab === 'extra' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
                       {/* Left Column: Subcategories (Spacious & Prominent) */}
-                      <div className="space-y-5 bg-gray-50/70 p-6 rounded-2xl border border-gray-200 flex flex-col justify-between min-h-[620px]">
-                        <div className="space-y-5">
-                          <div className="flex items-center justify-between border-b border-gray-200 pb-3.5">
-                            <label className="text-lg font-extrabold text-gray-900 flex items-center gap-2.5">
-                              <Layers size={22} className="text-blue-600" />
+                      <div className="space-y-3 bg-gray-50/70 p-4 rounded-lg border border-gray-200 flex flex-col justify-between">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+                            <label className="text-sm font-extrabold text-gray-900 flex items-center gap-2">
+                              <Layers size={18} className="text-blue-600" />
                               Danh mục phụ (Subcategories)
                             </label>
-                            <span className="text-xs text-gray-600 font-semibold bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-200">
+                            <span className="text-[11px] text-gray-600 font-semibold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full border border-blue-200">
                               Đã chọn: {(currentPlace.subCategories || []).length} danh mục
                             </span>
                           </div>
 
                           {/* Selected Subcategories Tags */}
-                          <div className="space-y-2">
-                            <span className="text-xs font-extrabold text-gray-700 block uppercase tracking-wider">Danh mục phụ đã gán:</span>
-                            <div className="flex flex-wrap gap-2.5 min-h-[56px] p-4 bg-white rounded-xl border border-gray-200 shadow-inner">
+                          <div className="space-y-1">
+                            <span className="text-[11px] font-extrabold text-gray-700 block uppercase tracking-wider">Danh mục phụ đã gán:</span>
+                            <div className="flex flex-wrap gap-1.5 min-h-[38px] p-2 bg-white rounded-md border border-gray-200 shadow-inner">
                               {(currentPlace.subCategories || []).length === 0 ? (
-                                <div className="flex items-center gap-2 text-sm text-gray-400 italic py-1">
+                                <div className="flex items-center gap-2 text-xs text-gray-400 italic py-0.5">
                                   <span>Chưa chọn danh mục phụ nào. Vui lòng chọn từ gợi ý bên dưới hoặc tự nhập thêm.</span>
                                 </div>
                               ) : (
                                 (currentPlace.subCategories || []).map((sub: string) => (
-                                  <span key={sub} className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-sm font-bold px-3.5 py-2 rounded-xl border border-blue-200 shadow-2xs animate-in fade-in duration-150">
+                                  <span key={sub} className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-md border border-blue-200 shadow-2xs">
                                     {sub}
                                     <button
                                       type="button"
@@ -2244,7 +2235,7 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                                         const updated = (currentPlace.subCategories || []).filter((s: string) => s !== sub);
                                         setCurrentPlace({ ...currentPlace, subCategories: updated });
                                       }}
-                                      className="text-blue-400 hover:text-blue-900 hover:bg-blue-100 p-0.5 rounded transition-colors cursor-pointer text-sm font-black shrink-0"
+                                      className="text-blue-400 hover:text-blue-900 hover:bg-blue-100 p-0.5 rounded transition-colors cursor-pointer text-xs font-black shrink-0"
                                       title="Xóa danh mục này"
                                     >
                                       &times;
@@ -2256,17 +2247,17 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                           </div>
 
                           {/* System Suggestions Grid with Live Search Filter */}
-                          <div className="space-y-2.5 pt-2">
+                          <div className="space-y-1.5 pt-1">
                             <div className="flex items-center justify-between">
-                              <span className="text-xs font-extrabold text-gray-700 flex items-center gap-2">
+                              <span className="text-[11px] font-extrabold text-gray-700 flex items-center gap-1.5">
                                 <span>Gợi ý danh mục phụ từ hệ thống:</span>
                                 {currentPlace.subCategoriesInput?.trim() && (
-                                  <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200 animate-in fade-in duration-150">
-                                    Kết quả tìm kiếm cho: "{currentPlace.subCategoriesInput.trim()}"
+                                  <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                                    Kết quả: "{currentPlace.subCategoriesInput.trim()}"
                                   </span>
                                 )}
                               </span>
-                              <span className="text-xs font-normal text-gray-500">(Click để thêm nhanh)</span>
+                              <span className="text-[11px] text-gray-500">(Click để thêm nhanh)</span>
                             </div>
 
                             {(() => {
@@ -2278,7 +2269,7 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
 
                               if (filteredSuggestions.length === 0) {
                                 return (
-                                  <div className="p-4 bg-white rounded-xl border border-dashed border-gray-300 text-center text-xs text-gray-500">
+                                  <div className="p-3 bg-white rounded-md border border-dashed border-gray-300 text-center text-xs text-gray-500">
                                     {query ? (
                                       <span>Không tìm thấy gợi ý nào khớp với "<strong>{currentPlace.subCategoriesInput}</strong>". Bấm nút <strong className="text-blue-600">+ Thêm</strong> hoặc nhấn <strong className="text-blue-600">Enter</strong> để tạo mới danh mục phụ này!</span>
                                     ) : (
@@ -2289,7 +2280,7 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                               }
 
                               return (
-                                <div className="flex flex-wrap gap-2.5 max-h-[260px] overflow-y-auto p-4 bg-white rounded-xl border border-gray-200 shadow-2xs pr-2">
+                                <div className="flex flex-wrap gap-1.5 max-h-[160px] overflow-y-auto p-2 bg-white rounded-md border border-gray-200 shadow-2xs pr-1">
                                   {filteredSuggestions.map((sub: string) => (
                                     <button
                                       key={sub}
@@ -2298,9 +2289,9 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                                         const updated = [...(currentPlace.subCategories || []), sub];
                                         setCurrentPlace({ ...currentPlace, subCategories: updated, subCategoriesInput: '' });
                                       }}
-                                      className="text-sm font-bold bg-gray-50 hover:bg-blue-50 text-gray-800 hover:text-blue-700 px-3.5 py-2 rounded-xl border border-gray-200 hover:border-blue-300 transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
+                                      className="text-xs font-bold bg-gray-50 hover:bg-blue-50 text-gray-800 hover:text-blue-700 px-2.5 py-1 rounded-md border border-gray-200 hover:border-blue-300 transition-all cursor-pointer shadow-2xs flex items-center gap-1"
                                     >
-                                      <Plus size={14} className="text-blue-600" />
+                                      <Plus size={12} className="text-blue-600" />
                                       {sub}
                                     </button>
                                   ))}
@@ -2311,14 +2302,13 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                         </div>
 
                         {/* Combined Search & Custom Subcategory Input Bar */}
-                        <div className="space-y-2.5 pt-4 border-t border-gray-200">
+                        <div className="space-y-1.5 pt-2 border-t border-gray-200">
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-extrabold text-gray-700 block">Tìm kiếm hoặc tự thêm danh mục phụ mới:</span>
-                            <span className="text-[11px] text-gray-500">Gõ từ khóa để lọc hoặc nhấn Enter để thêm mới</span>
+                            <span className="text-[11px] font-extrabold text-gray-700 block">Tìm kiếm hoặc tự thêm danh mục phụ mới:</span>
                           </div>
-                          <div className="flex gap-3">
+                          <div className="flex gap-2">
                             <div className="relative flex-1">
-                              <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                              <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                               <input
                                 type="text"
                                 placeholder="Nhập tìm kiếm hoặc gõ tên danh mục phụ mới..."
@@ -2340,16 +2330,16 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                                   }
                                 }}
                                 disabled={modalLoading}
-                                className="w-full text-sm text-gray-900 border border-gray-300 rounded-xl pl-10 pr-9 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                                className="w-full text-xs text-gray-900 border border-gray-300 rounded-md pl-8 pr-7 py-1.5 bg-white focus:outline-none focus:border-blue-600 shadow-2xs font-medium"
                               />
                               {currentPlace.subCategoriesInput && (
                                 <button
                                   type="button"
                                   onClick={() => setCurrentPlace({ ...currentPlace, subCategoriesInput: '' })}
-                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
                                   title="Xóa tìm kiếm"
                                 >
-                                  <X size={14} />
+                                  <X size={12} />
                                 </button>
                               )}
                             </div>
@@ -2368,9 +2358,9 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                                 });
                               }}
                               disabled={modalLoading || !currentPlace.subCategoriesInput?.trim()}
-                              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 shrink-0"
+                              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold rounded-md transition-all cursor-pointer shadow-2xs flex items-center gap-1 shrink-0"
                             >
-                              <Plus size={16} />
+                              <Plus size={14} />
                               Thêm
                             </button>
                           </div>
@@ -2378,14 +2368,14 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                       </div>
 
                       {/* Right Column: Opening Hours & Representative Image */}
-                      <div className="space-y-5">
-                        {/* Opening Hours (Giờ hoạt động chi tiết từng ngày) */}
-                        <div className="space-y-4 bg-gray-50/70 p-5 rounded-2xl border border-gray-200">
-                          <label className="text-base font-extrabold text-gray-900 flex items-center gap-2">
-                            <Clock size={20} className="text-blue-600" />
+                      <div className="space-y-3">
+                        {/* Opening Hours */}
+                        <div className="space-y-2 bg-gray-50/70 p-3.5 rounded-lg border border-gray-200">
+                          <label className="text-sm font-extrabold text-gray-900 flex items-center gap-2">
+                            <Clock size={18} className="text-blue-600" />
                             Giờ hoạt động chi tiết từng ngày
                           </label>
-                          <div className="space-y-3">
+                          <div className="space-y-1.5">
                             {[
                               { key: 'monday', label: 'Thứ 2' },
                               { key: 'tuesday', label: 'Thứ 3' },
@@ -2401,8 +2391,8 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                               const closeTime = isOpen ? dayHours[1] : '23:00';
 
                               return (
-                                <div key={day.key} className="flex items-center justify-between text-sm border-b border-gray-200/80 pb-3 last:border-0 last:pb-0">
-                                  <div className="flex items-center gap-3">
+                                <div key={day.key} className="flex items-center justify-between text-xs border-b border-gray-200/80 pb-1.5 last:border-0 last:pb-0">
+                                  <div className="flex items-center gap-2">
                                     <label className="flex items-center cursor-pointer select-none">
                                       <input
                                         type="checkbox"
@@ -2417,13 +2407,13 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                                           }
                                           setCurrentPlace({ ...currentPlace, openingHours: updatedHours });
                                         }}
-                                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                                        className="w-3.5 h-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                                       />
                                     </label>
-                                    <span className="font-bold text-gray-800 min-w-[85px]">{day.label}</span>
+                                    <span className="font-bold text-gray-800 min-w-[75px]">{day.label}</span>
                                   </div>
 
-                                  <div className="flex items-center gap-2.5">
+                                  <div className="flex items-center gap-2">
                                     <input
                                       type="time"
                                       value={openTime}
@@ -2433,9 +2423,9 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                                         updatedHours[day.key] = [e.target.value, closeTime];
                                         setCurrentPlace({ ...currentPlace, openingHours: updatedHours });
                                       }}
-                                      className="text-sm font-semibold text-gray-900 border border-gray-300 rounded-xl px-3 py-2 bg-white disabled:bg-gray-100 disabled:text-gray-400 focus:outline-none focus:border-blue-600 w-[130px] text-center"
+                                      className="text-xs font-semibold text-gray-900 border border-gray-300 rounded-md px-2 py-1 bg-white disabled:bg-gray-100 disabled:text-gray-400 focus:outline-none focus:border-blue-600 w-[105px] text-center"
                                     />
-                                    <span className="text-gray-400 text-sm font-bold">&ndash;</span>
+                                    <span className="text-gray-400 text-xs font-bold">&ndash;</span>
                                     <input
                                       type="time"
                                       value={closeTime}
@@ -2445,7 +2435,7 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                                         updatedHours[day.key] = [openTime, e.target.value];
                                         setCurrentPlace({ ...currentPlace, openingHours: updatedHours });
                                       }}
-                                      className="text-sm font-semibold text-gray-900 border border-gray-300 rounded-xl px-3 py-2 bg-white disabled:bg-gray-100 disabled:text-gray-400 focus:outline-none focus:border-blue-600 w-[130px] text-center"
+                                      className="text-xs font-semibold text-gray-900 border border-gray-300 rounded-md px-2 py-1 bg-white disabled:bg-gray-100 disabled:text-gray-400 focus:outline-none focus:border-blue-600 w-[105px] text-center"
                                     />
                                   </div>
                                 </div>
@@ -2454,26 +2444,26 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                           </div>
                         </div>
 
-                        {/* Representative Image Link & Preview */}
-                        <div className="space-y-4 bg-gray-50/70 p-5 rounded-2xl border border-gray-200">
+                        {/* Representative Image */}
+                        <div className="space-y-2 bg-gray-50/70 p-3.5 rounded-lg border border-gray-200">
                           <div className="flex items-center justify-between">
-                            <label className="text-base font-extrabold text-gray-900 flex items-center gap-2">
-                              <ImageIcon size={20} className="text-blue-600" />
+                            <label className="text-sm font-extrabold text-gray-900 flex items-center gap-2">
+                              <ImageIcon size={18} className="text-blue-600" />
                               Ảnh minh họa đại diện
                             </label>
                             <button
                               type="button"
                               disabled={uploadingThumbnail || modalLoading}
                               onClick={() => thumbnailInputRef.current?.click()}
-                              className="flex items-center gap-1.5 text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-3.5 py-1.5 rounded-xl border border-blue-200 transition-colors cursor-pointer disabled:opacity-50"
+                              className="flex items-center gap-1 text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-md border border-blue-200 transition-colors cursor-pointer disabled:opacity-50"
                             >
                               {uploadingThumbnail ? (
                                 <>
-                                  <Loader2 size={14} className="animate-spin text-blue-600" /> Đang tải Cloudinary...
+                                  <Loader2 size={12} className="animate-spin text-blue-600" /> Đang tải...
                                 </>
                               ) : (
                                 <>
-                                  <Upload size={14} /> Chọn ảnh từ máy...
+                                  <Upload size={12} /> Chọn từ máy...
                                 </>
                               )}
                             </button>
@@ -2485,17 +2475,17 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                               onChange={handleThumbnailFileChange}
                             />
                           </div>
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-3">
                             <input
                               type="text"
                               placeholder="Dán đường dẫn link URL (https://...) hoặc chọn ảnh ở trên"
                               value={currentPlace.image || ''}
                               onChange={(e) => setCurrentPlace({ ...currentPlace, image: e.target.value })}
                               disabled={modalLoading}
-                              className="flex-1 text-sm text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 shadow-2xs font-medium"
+                              className="flex-1 text-xs text-gray-900 border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-600 shadow-2xs font-medium"
                             />
                             {currentPlace.image && (
-                              <div className="w-14 h-14 rounded-xl overflow-hidden border border-gray-200 bg-white shrink-0 shadow-xs">
+                              <div className="w-10 h-10 rounded-md overflow-hidden border border-gray-200 bg-white shrink-0 shadow-xs">
                                 <img src={currentPlace.image} alt="" className="w-full h-full object-cover" />
                               </div>
                             )}
@@ -2507,60 +2497,60 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                 </div>
 
                 {/* Footer Buttons for Tab 1 & Tab 2 */}
-                <div className="flex items-center justify-between pt-5 border-t border-gray-200 shrink-0">
+                <div className="flex items-center justify-between pt-2.5 border-t border-gray-200 shrink-0 pr-14 sm:pr-20">
                   <div>
                     {activeTab === 'basic' ? (
                       <button
                         type="button"
                         onClick={() => setActiveTab('extra')}
-                        className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-4 py-2.5 rounded-xl transition-colors cursor-pointer"
+                        className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-3 py-1.5 rounded-md transition-colors cursor-pointer"
                       >
-                        Sang Tab 2: Danh mục phụ &amp; Giờ mở cửa <ArrowRight size={16} />
+                        Sang Tab 2: Danh mục phụ &amp; Giờ mở cửa <ArrowRight size={14} />
                       </button>
                     ) : (
-                      <div className="flex gap-3">
+                      <div className="flex gap-2">
                         <button
                           type="button"
                           onClick={() => setActiveTab('basic')}
-                          className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-4 py-2.5 rounded-xl transition-colors cursor-pointer"
+                          className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-3 py-1.5 rounded-md transition-colors cursor-pointer"
                         >
-                          <ArrowLeft size={16} /> Trở lại Tab 1: Thông tin cơ bản
+                          <ArrowLeft size={14} /> Trở lại Tab 1: Thông tin cơ bản
                         </button>
                         {modalType === 'edit' && (
                           <button
                             type="button"
                             onClick={() => setActiveTab('reviews')}
-                            className="flex items-center gap-2 text-sm font-bold text-amber-600 hover:text-amber-800 hover:bg-amber-50 px-4 py-2.5 rounded-xl transition-colors cursor-pointer"
+                            className="flex items-center gap-1.5 text-xs font-bold text-amber-600 hover:text-amber-800 hover:bg-amber-50 px-3 py-1.5 rounded-md transition-colors cursor-pointer"
                           >
-                            Sang Tab 3: Quản lý Đánh giá <ArrowRight size={16} />
+                            Sang Tab 3: Quản lý Đánh giá <ArrowRight size={14} />
                           </button>
                         )}
                       </div>
                     )}
                   </div>
 
-                  <div className="flex gap-4">
+                  <div className="flex gap-3">
                     <button
                       type="button"
                       onClick={() => setIsModalOpen(false)}
                       disabled={modalLoading}
-                      className="px-6 py-2.5 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-100 transition-colors text-sm font-bold cursor-pointer"
+                      className="px-4 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 transition-colors text-xs font-bold cursor-pointer"
                     >
                       Hủy
                     </button>
                     <button
                       type="submit"
                       disabled={modalLoading || uploadingThumbnail || uploadingDetailPhoto || uploadingAvatar}
-                      className="flex items-center gap-2 px-7 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-colors text-sm font-extrabold cursor-pointer shadow-md"
+                      className="flex items-center gap-1.5 px-5 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md transition-colors text-xs font-extrabold cursor-pointer shadow-md"
                     >
-                      {(modalLoading || uploadingThumbnail || uploadingDetailPhoto || uploadingAvatar) && <Loader2 size={18} className="animate-spin" />}
+                      {(modalLoading || uploadingThumbnail || uploadingDetailPhoto || uploadingAvatar) && <Loader2 size={15} className="animate-spin" />}
                       {uploadingThumbnail || uploadingDetailPhoto || uploadingAvatar
                         ? 'Đang tải ảnh...'
                         : modalLoading
-                        ? 'Đang lưu...'
-                        : modalType === 'create'
-                        ? 'Tạo địa điểm mới'
-                        : 'Lưu thay đổi'}
+                          ? 'Đang lưu...'
+                          : modalType === 'create'
+                            ? 'Tạo địa điểm mới'
+                            : 'Lưu thay đổi'}
                     </button>
                   </div>
                 </div>
@@ -2569,24 +2559,24 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
 
             {/* TAB 3: REVIEWS */}
             {activeTab === 'reviews' && (
-              <div className="flex-1 overflow-y-auto p-6 lg:p-8 flex flex-col justify-between space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start flex-1">
+              <div className="flex-1 overflow-y-auto p-4 lg:p-5 flex flex-col justify-between space-y-3">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start flex-1">
                   {/* Reviews List */}
-                  <div className="lg:col-span-2 space-y-5">
-                    <h4 className="font-extrabold text-gray-900 text-lg flex items-center justify-between border-b border-gray-200 pb-3 flex-wrap gap-2">
+                  <div className="lg:col-span-2 space-y-3">
+                    <h4 className="font-extrabold text-gray-900 text-base flex items-center justify-between border-b border-gray-200 pb-2 flex-wrap gap-2">
                       <span>Danh sách đánh giá</span>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => setShowReviewsImportHelp(true)}
-                          className="flex items-center gap-1.5 bg-white hover:bg-amber-50 text-gray-700 hover:text-amber-800 border border-gray-300 hover:border-amber-300 font-bold px-3 py-1.5 rounded-xl transition-colors cursor-pointer text-xs shadow-2xs"
+                          className="flex items-center gap-1.5 bg-white hover:bg-amber-50 text-gray-700 hover:text-amber-800 border border-gray-300 hover:border-amber-300 font-bold px-2.5 py-1 rounded-md transition-colors cursor-pointer text-xs shadow-2xs"
                           title="Xem hướng dẫn định dạng file import đánh giá"
                         >
-                          <Info size={14} className="text-amber-600" />
+                          <Info size={13} className="text-amber-600" />
                           <span>Hướng dẫn mẫu</span>
                         </button>
-                        <label className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold px-3 py-1.5 rounded-xl transition-colors cursor-pointer text-xs shadow-2xs">
-                          <Upload size={14} />
+                        <label className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold px-2.5 py-1 rounded-md transition-colors cursor-pointer text-xs shadow-2xs">
+                          <Upload size={13} />
                           <span>Import File Đánh giá</span>
                           <input
                             type="file"
@@ -2596,67 +2586,66 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                             className="hidden"
                           />
                         </label>
-                        <span className="text-xs font-bold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-xl">
+                        <span className="text-xs font-bold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-md">
                           {placeReviews.length} nhận xét
                         </span>
                       </div>
                     </h4>
-                    
+
                     {reviewsLoading ? (
-                      <div className="py-12 flex items-center justify-center text-gray-500">
-                        <Loader2 className="animate-spin text-blue-500 mr-2" size={26} />
-                        <span className="text-base font-semibold">Đang tải đánh giá...</span>
+                      <div className="py-8 flex items-center justify-center text-gray-500">
+                        <Loader2 className="animate-spin text-blue-500 mr-2" size={22} />
+                        <span className="text-sm font-semibold">Đang tải đánh giá...</span>
                       </div>
                     ) : placeReviews.length === 0 ? (
-                      <div className="py-12 text-center text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl text-base">
+                      <div className="py-8 text-center text-gray-400 border-2 border-dashed border-gray-200 rounded-lg text-sm">
                         Chưa có đánh giá nào cho địa điểm này.
                       </div>
                     ) : (
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         {placeReviews.map((review) => (
-                          <div key={review.id} className="p-5 bg-gray-50/70 hover:bg-gray-50 rounded-2xl border border-gray-200 transition-all flex gap-4 items-start relative group shadow-2xs">
-                            <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 border border-gray-200 shrink-0 flex items-center justify-center text-gray-400">
+                          <div key={review.id} className="p-3.5 bg-gray-50/70 hover:bg-gray-50 rounded-lg border border-gray-200 transition-all flex gap-3 items-start relative group shadow-2xs">
+                            <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-100 border border-gray-200 shrink-0 flex items-center justify-center text-gray-400">
                               {review.authorAvatar ? (
                                 <img src={review.authorAvatar} alt="" className="object-cover w-full h-full" />
                               ) : (
-                                <User size={22} />
+                                <User size={18} />
                               )}
                             </div>
-                            
-                            <div className="flex-1 min-w-0 space-y-1.5">
-                              <div className="flex items-center gap-2.5 flex-wrap">
-                                <span className="font-extrabold text-gray-900 text-base">{review.authorName || 'Ẩn danh'}</span>
+
+                            <div className="flex-1 min-w-0 space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-extrabold text-gray-900 text-xs sm:text-sm">{review.authorName || 'Ẩn danh'}</span>
                                 {review.authorLocation && (
-                                  <span className="text-xs text-gray-600 bg-gray-200/70 px-2 py-0.5 rounded-md font-medium">
+                                  <span className="text-[11px] text-gray-600 bg-gray-200/70 px-1.5 py-0.5 rounded-md font-medium">
                                     📍 {review.authorLocation}
                                   </span>
                                 )}
-                                <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-md border uppercase shrink-0 ${
-                                  review.source === 'TRIPADVISOR' 
-                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                                    : 'bg-blue-50 text-blue-700 border-blue-200'
-                                }`}>
+                                <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md border uppercase shrink-0 ${review.source === 'TRIPADVISOR'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-blue-50 text-blue-700 border-blue-200'
+                                  }`}>
                                   {review.source || 'LOCAL'}
                                 </span>
                               </div>
 
                               <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-1 text-amber-400">
+                                <div className="flex items-center gap-0.5 text-amber-400">
                                   {[1, 2, 3, 4, 5].map((star) => (
                                     <Star
                                       key={star}
-                                      size={14}
+                                      size={12}
                                       fill={star <= (review.rating || 0) ? "currentColor" : "none"}
                                       className={star <= (review.rating || 0) ? "text-amber-400" : "text-gray-300"}
                                     />
                                   ))}
                                 </div>
-                                <span className="text-xs font-bold text-gray-500">
+                                <span className="text-[11px] font-bold text-gray-500">
                                   {review.publishedDate ? new Date(review.publishedDate).toLocaleDateString('vi-VN') : ''}
                                 </span>
                               </div>
 
-                              <p className="text-gray-800 text-sm mt-2 leading-relaxed bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs font-medium">
+                              <p className="text-gray-800 text-xs mt-1.5 leading-relaxed bg-white p-2.5 rounded-md border border-gray-200 shadow-2xs font-medium">
                                 {review.comment || '(Không có nhận xét)'}
                               </p>
                             </div>
@@ -2664,10 +2653,10 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                             <button
                               type="button"
                               onClick={() => handleDeleteReview(Number(review.id))}
-                              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-red-650 hover:bg-red-50 rounded-xl transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+                              className="absolute top-3 right-3 p-1.5 text-gray-400 hover:text-red-650 hover:bg-red-50 rounded-md transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
                               title="Xóa đánh giá"
                             >
-                              <Trash2 size={16} />
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         ))}
@@ -2676,80 +2665,80 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                   </div>
 
                   {/* Add Review Form */}
-                  <form onSubmit={handleAddReview} className="p-6 bg-gray-50/70 rounded-2xl border border-gray-200 space-y-5 h-fit shadow-xs">
-                    <h4 className="font-extrabold text-gray-900 text-base flex items-center gap-2 border-b border-gray-200 pb-3">
-                      <Plus size={18} className="text-blue-600" />
+                  <form onSubmit={handleAddReview} className="p-4 bg-gray-50/70 rounded-lg border border-gray-200 space-y-3 h-fit shadow-xs">
+                    <h4 className="font-extrabold text-gray-900 text-sm flex items-center gap-1.5 border-b border-gray-200 pb-2">
+                      <Plus size={16} className="text-blue-600" />
                       Thêm đánh giá mới
                     </h4>
 
                     {reviewError && (
-                      <div className="text-sm font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded-xl p-3 flex items-center gap-2 animate-in fade-in duration-150">
-                        <AlertCircle size={16} className="shrink-0" />
+                      <div className="text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded-md p-2.5 flex items-center gap-1.5">
+                        <AlertCircle size={14} className="shrink-0" />
                         <span>{reviewError}</span>
                       </div>
                     )}
 
-                    <div className="space-y-4">
-                      <div className="space-y-1.5">
-                        <label className="font-bold text-gray-800 text-sm block">Tên người đánh giá *</label>
+                    <div className="space-y-2.5">
+                      <div className="space-y-1">
+                        <label className="font-bold text-gray-700 text-xs block">Tên người đánh giá *</label>
                         <input
                           type="text"
                           required
                           value={newReview.authorName}
                           onChange={(e) => setNewReview({ ...newReview, authorName: e.target.value })}
                           placeholder="VD: Nguyen Van A"
-                          className="w-full text-sm text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 font-medium"
+                          className="w-full text-xs text-gray-900 border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-600 font-medium"
                         />
                       </div>
 
-                      <div className="space-y-1.5">
-                        <label className="font-bold text-gray-800 text-sm block">Số sao đánh giá *</label>
-                        <div className="flex items-center gap-1.5">
+                      <div className="space-y-1">
+                        <label className="font-bold text-gray-700 text-xs block">Số sao đánh giá *</label>
+                        <div className="flex items-center gap-1">
                           {[1, 2, 3, 4, 5].map((star) => (
                             <button
                               key={star}
                               type="button"
                               onClick={() => setNewReview({ ...newReview, rating: star })}
-                              className="p-1 text-amber-400 hover:scale-110 transition-transform cursor-pointer"
+                              className="p-0.5 text-amber-400 hover:scale-110 transition-transform cursor-pointer"
                             >
                               <Star
-                                size={24}
+                                size={18}
                                 fill={star <= newReview.rating ? "currentColor" : "none"}
                                 className={star <= newReview.rating ? "text-amber-400" : "text-gray-300"}
                               />
                             </button>
                           ))}
-                          <span className="ml-2 font-bold text-gray-800 text-sm">{newReview.rating} sao</span>
+                          <span className="ml-1.5 font-bold text-gray-800 text-xs">{newReview.rating} sao</span>
                         </div>
                       </div>
 
-                      <div className="space-y-1.5">
-                        <label className="font-bold text-gray-800 text-sm block">Quê quán / Vị trí (Tùy chọn)</label>
+                      <div className="space-y-1">
+                        <label className="font-bold text-gray-700 text-xs block">Quê quán / Vị trí (Tùy chọn)</label>
                         <input
                           type="text"
                           value={newReview.authorLocation}
                           onChange={(e) => setNewReview({ ...newReview, authorLocation: e.target.value })}
                           placeholder="VD: Cần Thơ, TP.HCM..."
-                          className="w-full text-sm text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 font-medium"
+                          className="w-full text-xs text-gray-900 border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-600 font-medium"
                         />
                       </div>
 
-                      <div className="space-y-1.5">
+                      <div className="space-y-1">
                         <div className="flex items-center justify-between">
-                          <label className="font-bold text-gray-800 text-sm block">Ảnh đại diện (Link Avatar URL)</label>
+                          <label className="font-bold text-gray-700 text-xs block">Ảnh đại diện (Link Avatar URL)</label>
                           <button
                             type="button"
                             disabled={uploadingAvatar || modalLoading}
                             onClick={() => avatarInputRef.current?.click()}
-                            className="text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg border border-blue-200 transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                            className="text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded border border-blue-200 transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1"
                           >
                             {uploadingAvatar ? (
                               <>
-                                <Loader2 size={12} className="animate-spin text-blue-600" /> Đang tải...
+                                <Loader2 size={11} className="animate-spin text-blue-600" /> Đang tải...
                               </>
                             ) : (
                               <>
-                                <Upload size={12} /> Chọn từ máy...
+                                <Upload size={11} /> Chọn ảnh...
                               </>
                             )}
                           </button>
@@ -2766,47 +2755,47 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                           value={newReview.authorAvatar}
                           onChange={(e) => setNewReview({ ...newReview, authorAvatar: e.target.value })}
                           placeholder="https://... hoặc chọn ảnh từ máy ở trên"
-                          className="w-full text-sm text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 font-medium"
+                          className="w-full text-xs text-gray-900 border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-600 font-medium"
                         />
                       </div>
 
-                      <div className="space-y-1.5">
-                        <label className="font-bold text-gray-800 text-sm block">Nội dung nhận xét *</label>
+                      <div className="space-y-1">
+                        <label className="font-bold text-gray-700 text-xs block">Nội dung nhận xét *</label>
                         <textarea
                           required
-                          rows={4}
+                          rows={3}
                           value={newReview.comment}
                           onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
                           placeholder="Nhập nhận xét chi tiết..."
-                          className="w-full text-sm text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 font-medium"
+                          className="w-full text-xs text-gray-900 border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-600 font-medium resize-none"
                         />
                       </div>
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold rounded-xl text-sm transition-colors shadow-xs cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-extrabold rounded-md text-xs transition-colors shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
                     >
-                      <Plus size={18} /> Thêm đánh giá vào danh sách
+                      <Plus size={16} /> Thêm đánh giá vào danh sách
                     </button>
                   </form>
                 </div>
 
                 {/* Footer Buttons for Tab 3: Reviews */}
-                <div className="flex items-center justify-between pt-5 border-t border-gray-200 shrink-0">
+                <div className="flex items-center justify-between pt-2.5 border-t border-gray-200 shrink-0 pr-14 sm:pr-20">
                   <button
                     type="button"
                     onClick={() => setActiveTab('extra')}
-                    className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-4 py-2.5 rounded-xl transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-3 py-1.5 rounded-md transition-colors cursor-pointer"
                   >
-                    <ArrowLeft size={16} /> Trở lại Tab 2: Danh mục phụ
+                    <ArrowLeft size={14} /> Trở lại Tab 2: Danh mục phụ
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveTab('photos')}
-                    className="flex items-center gap-2 text-sm font-bold text-purple-600 hover:text-purple-800 hover:bg-purple-50 px-4 py-2.5 rounded-xl transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 text-xs font-bold text-purple-600 hover:text-purple-800 hover:bg-purple-50 px-3 py-1.5 rounded-md transition-colors cursor-pointer"
                   >
-                    Sang Tab 4: Bộ sưu tập Hình ảnh <ArrowRight size={16} />
+                    Sang Tab 4: Bộ sưu tập Hình ảnh <ArrowRight size={14} />
                   </button>
                 </div>
               </div>
@@ -2814,24 +2803,24 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
 
             {/* TAB 4: PHOTOS */}
             {activeTab === 'photos' && (
-              <div className="flex-1 overflow-y-auto p-6 lg:p-8 flex flex-col justify-between space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start flex-1">
+              <div className="flex-1 overflow-y-auto p-4 lg:p-5 flex flex-col justify-between space-y-3">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start flex-1">
                   {/* Photo Gallery List */}
-                  <div className="lg:col-span-2 space-y-5">
-                    <h4 className="font-extrabold text-gray-900 text-lg flex items-center justify-between border-b border-gray-200 pb-3 flex-wrap gap-2">
+                  <div className="lg:col-span-2 space-y-3">
+                    <h4 className="font-extrabold text-gray-900 text-base flex items-center justify-between border-b border-gray-200 pb-2 flex-wrap gap-2">
                       <span>Bộ sưu tập ảnh chi tiết</span>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => setShowPhotosImportHelp(true)}
-                          className="flex items-center gap-1.5 bg-white hover:bg-purple-50 text-gray-700 hover:text-purple-800 border border-gray-300 hover:border-purple-300 font-bold px-3 py-1.5 rounded-xl transition-colors cursor-pointer text-xs shadow-2xs"
+                          className="flex items-center gap-1.5 bg-white hover:bg-purple-50 text-gray-700 hover:text-purple-800 border border-gray-300 hover:border-purple-300 font-bold px-2.5 py-1 rounded-md transition-colors cursor-pointer text-xs shadow-2xs"
                           title="Xem hướng dẫn định dạng file import hình ảnh"
                         >
-                          <Info size={14} className="text-purple-600" />
+                          <Info size={13} className="text-purple-600" />
                           <span>Hướng dẫn mẫu</span>
                         </button>
-                        <label className="flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-300 font-bold px-3 py-1.5 rounded-xl transition-colors cursor-pointer text-xs shadow-2xs">
-                          <Upload size={14} />
+                        <label className="flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-300 font-bold px-2.5 py-1 rounded-md transition-colors cursor-pointer text-xs shadow-2xs">
+                          <Upload size={13} />
                           <span>Import File Ảnh (JSON/CSV)</span>
                           <input
                             type="file"
@@ -2841,44 +2830,44 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                             className="hidden"
                           />
                         </label>
-                        <span className="text-xs font-bold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-xl">
+                        <span className="text-xs font-bold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-md">
                           {placePhotos.length} hình ảnh
                         </span>
                       </div>
                     </h4>
-                    
+
                     {photosLoading ? (
-                      <div className="py-12 flex items-center justify-center text-gray-500">
-                        <Loader2 className="animate-spin text-blue-500 mr-2" size={26} />
-                        <span className="text-base font-semibold">Đang tải hình ảnh...</span>
+                      <div className="py-8 flex items-center justify-center text-gray-500">
+                        <Loader2 className="animate-spin text-blue-500 mr-2" size={22} />
+                        <span className="text-sm font-semibold">Đang tải hình ảnh...</span>
                       </div>
                     ) : placePhotos.length === 0 ? (
-                      <div className="py-12 text-center text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl text-base">
+                      <div className="py-8 text-center text-gray-400 border-2 border-dashed border-gray-200 rounded-lg text-sm">
                         Chưa có hình ảnh phụ nào cho địa điểm này.
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-5">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {placePhotos.map((photo) => (
-                          <div key={photo.id} className="relative group border border-gray-250 rounded-2xl overflow-hidden bg-gray-50 shadow-xs flex flex-col justify-between">
+                          <div key={photo.id} className="relative group border border-gray-250 rounded-lg overflow-hidden bg-gray-50 shadow-xs flex flex-col justify-between">
                             <div className="relative w-full aspect-video">
-                              <img 
-                                src={photo.urlOriginal} 
-                                alt={photo.caption || ""} 
+                              <img
+                                src={photo.urlOriginal}
+                                alt={photo.caption || ""}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                 onError={(e) => {
                                   const target = e.target as HTMLElement;
                                   target.style.display = 'none';
                                   const parent = target.parentElement;
                                   if (parent) {
-                                    parent.classList.add('flex', 'flex-col', 'items-center', 'justify-center', 'bg-rose-50', 'p-3', 'text-center');
-                                    parent.innerHTML = '<div class="text-xs text-rose-600 font-bold">⚠️ Link ảnh hỏng</div><div class="text-[11px] text-gray-400 italic">Bấm 🗑️ để xóa</div>';
+                                    parent.classList.add('flex', 'flex-col', 'items-center', 'justify-center', 'bg-rose-50', 'p-2', 'text-center');
+                                    parent.innerHTML = '<div class="text-[11px] text-rose-600 font-bold">⚠️ Link ảnh hỏng</div><div class="text-[10px] text-gray-400 italic">Bấm 🗑️ để xóa</div>';
                                   }
                                 }}
                               />
                             </div>
-                            
+
                             {photo.caption && (
-                              <div className="p-3 bg-white text-xs font-medium text-gray-700 line-clamp-1 border-t border-gray-100">
+                              <div className="p-2 bg-white text-[11px] font-medium text-gray-700 line-clamp-1 border-t border-gray-100">
                                 {photo.caption}
                               </div>
                             )}
@@ -2886,10 +2875,10 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                             <button
                               type="button"
                               onClick={() => handleDeletePhoto(Number(photo.id))}
-                              className="absolute top-2.5 right-2.5 p-2 bg-black/60 hover:bg-red-600 text-white rounded-xl transition-colors cursor-pointer"
+                              className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-red-600 text-white rounded-md transition-colors cursor-pointer"
                               title="Xóa ảnh"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={13} />
                             </button>
                           </div>
                         ))}
@@ -2898,36 +2887,36 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                   </div>
 
                   {/* Add Photo Form */}
-                  <form onSubmit={handleAddPhoto} className="p-6 bg-gray-50/70 rounded-2xl border border-gray-200 space-y-5 h-fit shadow-xs">
-                    <h4 className="font-extrabold text-gray-900 text-base flex items-center gap-2 border-b border-gray-200 pb-3">
-                      <Plus size={18} className="text-blue-600" />
+                  <form onSubmit={handleAddPhoto} className="p-4 bg-gray-50/70 rounded-lg border border-gray-200 space-y-3 h-fit shadow-xs">
+                    <h4 className="font-extrabold text-gray-900 text-sm flex items-center gap-1.5 border-b border-gray-200 pb-2">
+                      <Plus size={16} className="text-blue-600" />
                       Thêm ảnh mới
                     </h4>
 
                     {photoError && (
-                      <div className="text-sm font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded-xl p-3 flex items-center gap-2 animate-in fade-in duration-150">
-                        <AlertCircle size={16} className="shrink-0" />
+                      <div className="text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded-md p-2.5 flex items-center gap-1.5">
+                        <AlertCircle size={14} className="shrink-0" />
                         <span>{photoError}</span>
                       </div>
                     )}
 
-                    <div className="space-y-4">
+                    <div className="space-y-2.5">
                       {/* Device File Picker Button */}
-                      <div className="space-y-1.5">
-                        <label className="font-bold text-gray-800 text-sm block">Chọn ảnh từ máy tính</label>
+                      <div className="space-y-1">
+                        <label className="font-bold text-gray-700 text-xs block">Chọn ảnh từ máy tính</label>
                         <button
                           type="button"
                           disabled={uploadingDetailPhoto || modalLoading}
                           onClick={() => detailPhotoInputRef.current?.click()}
-                          className="w-full flex items-center justify-center gap-2 bg-purple-50 hover:bg-purple-100 text-purple-700 font-extrabold px-4 py-2.5 rounded-xl border border-purple-200 text-sm transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
+                          className="w-full flex items-center justify-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-extrabold px-3 py-2 rounded-md border border-purple-200 text-xs transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
                         >
                           {uploadingDetailPhoto ? (
                             <>
-                              <Loader2 size={16} className="animate-spin text-purple-700" /> Đang tải Cloudinary...
+                              <Loader2 size={14} className="animate-spin text-purple-700" /> Đang tải...
                             </>
                           ) : (
                             <>
-                              <Upload size={16} /> Chọn ảnh từ máy...
+                              <Upload size={14} /> Chọn ảnh từ máy...
                             </>
                           )}
                         </button>
@@ -2940,52 +2929,52 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                         />
                       </div>
 
-                      <div className="space-y-1.5">
-                        <label className="font-bold text-gray-800 text-sm block">Hoặc dán Link URL ảnh *</label>
+                      <div className="space-y-1">
+                        <label className="font-bold text-gray-700 text-xs block">Hoặc dán Link URL ảnh *</label>
                         <input
                           type="text"
                           required
                           value={newPhoto.urlOriginal}
                           onChange={(e) => setNewPhoto({ ...newPhoto, urlOriginal: e.target.value })}
                           placeholder="https://images.unsplash.com/... hoặc chọn ảnh ở trên"
-                          className="w-full text-sm text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 font-medium"
+                          className="w-full text-xs text-gray-900 border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-600 font-medium"
                         />
                       </div>
 
-                      <div className="space-y-1.5">
-                        <label className="font-bold text-gray-800 text-sm block">Chú thích ảnh (Tùy chọn)</label>
+                      <div className="space-y-1">
+                        <label className="font-bold text-gray-700 text-xs block">Chú thích ảnh (Tùy chọn)</label>
                         <input
                           type="text"
                           value={newPhoto.caption}
                           onChange={(e) => setNewPhoto({ ...newPhoto, caption: e.target.value })}
                           placeholder="VD: View ngắm hoàng hôn, Không gian trong quán..."
-                          className="w-full text-sm text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 font-medium"
+                          className="w-full text-xs text-gray-900 border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:border-blue-600 font-medium"
                         />
                       </div>
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold rounded-xl text-sm transition-colors shadow-xs cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-extrabold rounded-md text-xs transition-colors shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
                     >
-                      <Plus size={18} /> Thêm ảnh vào bộ sưu tập
+                      <Plus size={16} /> Thêm ảnh vào bộ sưu tập
                     </button>
                   </form>
                 </div>
 
                 {/* Footer Buttons for Tab 4: Photos */}
-                <div className="flex items-center justify-between pt-5 border-t border-gray-200 shrink-0">
+                <div className="flex items-center justify-between pt-2.5 border-t border-gray-200 shrink-0 pr-14 sm:pr-20">
                   <button
                     type="button"
                     onClick={() => setActiveTab('reviews')}
-                    className="flex items-center gap-2 text-sm font-bold text-amber-600 hover:text-amber-800 hover:bg-amber-50 px-4 py-2.5 rounded-xl transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 text-xs font-bold text-amber-600 hover:text-amber-800 hover:bg-amber-50 px-3 py-1.5 rounded-md transition-colors cursor-pointer"
                   >
-                    <ArrowLeft size={16} /> Trở lại Tab 3: Quản lý Đánh giá
+                    <ArrowLeft size={14} /> Trở lại Tab 3: Quản lý Đánh giá
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-7 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl transition-colors text-sm font-extrabold cursor-pointer shadow-md"
+                    className="px-5 py-1.5 bg-gray-900 hover:bg-gray-800 text-white rounded-md transition-colors text-xs font-extrabold cursor-pointer shadow-md"
                   >
                     Hoàn tất
                   </button>

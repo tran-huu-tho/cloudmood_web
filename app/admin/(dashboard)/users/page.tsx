@@ -288,24 +288,24 @@ export default function UsersPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="text-gray-500 bg-gray-50 border-b border-gray-200 font-semibold uppercase tracking-wider">
-                  <th className="px-6 py-4">Người dùng</th>
-                  <th className="px-6 py-4">Vai trò</th>
-                  <th className="px-6 py-4">Ngày tạo</th>
-                  <th className="px-6 py-4">Trạng thái</th>
-                  <th className="px-6 py-4 text-right">Thao tác</th>
+                <tr className="text-gray-500 bg-gray-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 text-xs font-bold uppercase tracking-wider">
+                  <th className="px-4 py-3">Người dùng</th>
+                  <th className="px-4 py-3">Vai trò</th>
+                  <th className="px-4 py-3">Ngày tạo</th>
+                  <th className="px-4 py-3">Trạng thái</th>
+                  <th className="px-4 py-3 text-right">Thao tác</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                 {paginatedUsers.map((user) => (
                   <tr
                     key={user.id}
-                    className="hover:bg-gray-50/50 transition-colors"
+                    className="hover:bg-gray-50/50 dark:hover:bg-slate-800/20 transition-colors"
                   >
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="p-[2px] bg-gradient-to-tr from-pink-500 via-purple-500 to-blue-400 rounded-full shrink-0">
-                          <div className="bg-white rounded-full p-[1.5px] w-10 h-10 overflow-hidden flex items-center justify-center text-sm">
+                          <div className="bg-white dark:bg-slate-900 rounded-full p-[1.5px] w-9 h-9 overflow-hidden flex items-center justify-center text-sm">
                             <img
                               src={getAvatarUrl(user.avatar)}
                               alt={user.fullName || 'User'}
@@ -314,42 +314,42 @@ export default function UsersPage() {
                           </div>
                         </div>
                         <div className="min-w-0">
-                          <p className="font-semibold text-gray-900 text-sm">
+                          <p className="font-semibold text-gray-900 dark:text-slate-100 text-sm">
                             {user.fullName || 'Chưa đặt tên'}
                           </p>
-                          <p className="text-xs text-gray-500 truncate">
+                          <p className="text-xs text-gray-500 dark:text-slate-400 truncate">
                             {user.email}
                           </p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       {user.role ? (
-                        <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full border border-blue-200">
+                        <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 text-xs font-semibold px-2.5 py-1 rounded-full border border-blue-200 dark:border-blue-900">
                           <Shield size={12} />
                           Quản trị viên
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 text-xs font-semibold px-2.5 py-1 rounded-full border border-gray-200">
+                        <span className="inline-flex items-center gap-1 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 text-xs font-semibold px-2.5 py-1 rounded-full border border-gray-200 dark:border-slate-700">
                           Thành viên
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-gray-650 font-semibold">
+                    <td className="px-4 py-3 text-gray-650 dark:text-slate-300 font-semibold">
                       {getFormattedDate(user.createdAt)}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       {user.isBlocked ? (
-                        <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 text-xs font-semibold px-2.5 py-1 rounded-full border border-rose-200">
+                        <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 text-xs font-semibold px-2.5 py-1 rounded-full border border-rose-200 dark:border-rose-900">
                           Đã khóa
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-xs font-semibold px-2.5 py-1 rounded-full border border-emerald-200">
+                        <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 text-xs font-semibold px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-900">
                           Hoạt động
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right space-x-2">
+                    <td className="px-4 py-3 text-right space-x-2">
                       <button
                         onClick={() => handleOpenView(user)}
                         className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"

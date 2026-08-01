@@ -199,10 +199,10 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
   };
 
   return (
-    <header className="h-20 bg-white border-b border-gray-200 flex items-center justify-between px-8 shrink-0 relative">
+    <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between px-6 shrink-0 relative">
       {/* Local floating toast */}
       {localToast.show && (
-        <div className="absolute top-22 right-8 z-[9999] bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg border border-slate-800 flex items-center gap-2 animate-[slideIn_0.2s_ease-out]">
+        <div className="absolute top-18 right-6 z-[9999] bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg border border-slate-800 flex items-center gap-2 animate-[slideIn_0.2s_ease-out]">
           <CheckCircle2 size={14} className={localToast.type === 'success' ? 'text-emerald-400' : 'text-blue-400'} />
           <span>{localToast.message}</span>
         </div>
@@ -211,27 +211,26 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
       {/* Left placeholder / Menu trigger */}
       <button 
         onClick={onMenuClick}
-        className="lg:hidden p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-slate-100 border border-transparent hover:border-slate-200/60 cursor-pointer mr-4"
+        className="lg:hidden p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-slate-100 border border-transparent hover:border-slate-200/60 cursor-pointer mr-3"
         title="Mở menu"
       >
-        <Menu size={22} />
+        <Menu size={20} />
       </button>
-      <div className="w-80 hidden lg:block"></div>
- 
-      {/* Search Bar centered */}
-      <div className="flex-1 max-w-2xl mx-auto">
+
+      {/* Search Bar */}
+      <div className="flex-1 max-w-xl">
         <div className="relative w-full">
-          <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <input 
             type="text" 
             placeholder="Tìm kiếm..."
-            className="w-full bg-gray-50 text-gray-900 text-base rounded-xl pl-12 pr-4 py-2.5 border border-gray-200 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+            className="w-full bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-slate-100 text-sm rounded-xl pl-10 pr-4 py-2 border border-gray-200 dark:border-slate-800 focus:outline-none focus:border-blue-500 transition-all font-medium"
           />
         </div>
       </div>
  
       {/* Right controls */}
-      <div className="flex items-center gap-5 text-gray-500 w-80 justify-end shrink-0">
+      <div className="flex items-center gap-4 text-gray-500 justify-end shrink-0 ml-4">
         
         {/* Notifications Bell */}
         <div className="relative" ref={notificationsRef}>
@@ -359,22 +358,22 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
           )}
         </div>
 
-        <div className="flex items-center gap-3 ml-1 relative" ref={dropdownRef}>
-          <span className="text-base font-semibold text-gray-800 hidden sm:inline-block whitespace-nowrap">{adminName}</span>
+        <div className="flex items-center gap-2.5 ml-1 relative" ref={dropdownRef}>
+          <span className="text-sm font-bold text-gray-800 dark:text-slate-100 hidden sm:inline-block whitespace-nowrap">{adminName}</span>
           <button 
             onClick={() => {
               setIsDropdownOpen(!isDropdownOpen);
               setIsNotificationsOpen(false);
               setIsSettingsOpen(false);
             }}
-            className="p-[2px] bg-gradient-to-tr from-pink-500 via-purple-500 to-blue-400 rounded-full hover:shadow transition-shadow cursor-pointer shrink-0"
+            className="p-[1.5px] bg-gradient-to-tr from-pink-500 via-purple-500 to-blue-400 rounded-full hover:shadow transition-shadow cursor-pointer shrink-0"
           >
-            <div className="bg-white rounded-full p-[2px] w-12 h-12 overflow-hidden flex items-center justify-center">
+            <div className="bg-white dark:bg-slate-900 rounded-full p-[1.5px] w-9 h-9 overflow-hidden flex items-center justify-center">
               {adminAvatar ? (
                 <img src={adminAvatar} alt="Admin Avatar" className="w-full h-full object-cover rounded-full" />
               ) : (
-                <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 rounded-full">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <div className="w-full h-full bg-gray-100 dark:bg-slate-800 flex items-center justify-center text-gray-400 rounded-full">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                 </div>
