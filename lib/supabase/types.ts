@@ -32,9 +32,11 @@ export type Place = {
   externalId: string | null;
   phone: string | null;
   website: string | null;
+  tripadvisorUrl?: string | null;
   priceLevel: string | null;
   subCategories?: string[] | null;
   openingHours?: any | null;
+  isApproved?: boolean | null;
   lastSyncedAt: string | null;
   _count?: { reviews: number } | null;
 };

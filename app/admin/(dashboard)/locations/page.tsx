@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef, useTransition, startTransition } from 'react';
 import dynamic from 'next/dynamic';
 import { Place, Category } from '@/lib/supabase/types';
-import { Plus, Edit2, Trash2, Search, X, Loader2, MapPin, ExternalLink, Check, Upload, Star, MessageSquare, Calendar, Clock, Image as ImageIcon, Info, ArrowRight, ArrowLeft, Layers, AlertCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, X, Loader2, MapPin, ExternalLink, Check, Upload, Star, MessageSquare, Calendar, Clock, Image as ImageIcon, Info, ArrowRight, ArrowLeft, Layers, AlertCircle, Eye, EyeOff, User } from 'lucide-react';
 import { cleanAddress, formatPrice } from '@/lib/utils';
 import { getCategoryIcon } from '../categories/page';
 
@@ -126,6 +126,8 @@ export default function LocationsPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showImportHelp, setShowImportHelp] = useState(false);
+  const [showReviewsImportHelp, setShowReviewsImportHelp] = useState(false);
+  const [showPhotosImportHelp, setShowPhotosImportHelp] = useState(false);
   const [modalType, setModalType] = useState<'create' | 'edit'>('create');
   const [currentPlace, setCurrentPlace] = useState<any>({
     name: '',
@@ -138,25 +140,25 @@ export default function LocationsPage() {
     image: '',
     phone: '',
     website: '',
+    tripadvisorUrl: '',
     priceLevel: 'MODERATE',
     subCategories: [],
     subCategoriesInput: '',
     openingHours: {
-      monday: ['08:00', '21:00'],
-      tuesday: ['08:00', '21:00'],
-      wednesday: ['08:00', '21:00'],
-      thursday: ['08:00', '21:00'],
-      friday: ['08:00', '21:00'],
-      saturday: ['08:00', '21:00'],
-      sunday: ['08:00', '21:00']
+      monday: ['07:00', '23:00'],
+      tuesday: ['07:00', '23:00'],
+      wednesday: ['07:00', '23:00'],
+      thursday: ['07:00', '23:00'],
+      friday: ['07:00', '23:00'],
+      saturday: ['07:00', '23:00'],
+      sunday: ['07:00', '23:00']
     }
   });
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
 
-  // Tabs State (For Edit Modal)
-  const [activeTab, setActiveTab] = useState<'general' | 'reviews' | 'photos'>('general');
-  const [formSubTab, setFormSubTab] = useState<'basic' | 'extra'>('basic');
+  // Tabs State (For Modal: basic | extra | reviews | photos)
+  const [activeTab, setActiveTab] = useState<'basic' | 'extra' | 'reviews' | 'photos'>('basic');
   const [placeReviews, setPlaceReviews] = useState<any[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [placePhotos, setPlacePhotos] = useState<any[]>([]);
@@ -164,6 +166,7 @@ export default function LocationsPage() {
 
   const [newReview, setNewReview] = useState({
     authorName: '',
+    authorAvatar: '',
     rating: 5,
     comment: '',
     publishedDate: '',
@@ -181,6 +184,27 @@ export default function LocationsPage() {
   // File Upload Refs & Compressor
   const thumbnailInputRef = useRef<HTMLInputElement>(null);
   const detailPhotoInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const importReviewsInputRef = useRef<HTMLInputElement>(null);
+  const importPhotosInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
+  const [uploadingDetailPhoto, setUploadingDetailPhoto] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const uploadImageToCloudinary = async (base64Str: string, folder = 'cloudmood_places'): Promise<string> => {
+    const res = await fetch('/api/admin/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: base64Str, folder }),
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Lỗi khi tải ảnh lên Cloudinary.');
+    }
+    const data = await res.json();
+    if (!data.url) throw new Error('Không nhận được link ảnh từ Cloudinary.');
+    return data.url;
+  };
 
   const compressImageFile = (file: File, maxWidth = 1200, quality = 0.85): Promise<string> => {
     return new Promise((resolve) => {
@@ -219,14 +243,42 @@ export default function LocationsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setUploadingThumbnail(true);
     try {
+      showToast('Đang xử lý và tải ảnh lên Cloudinary...', 'success');
       const compressed = await compressImageFile(file, 1200, 0.85);
       if (compressed) {
-        setCurrentPlace((prev: any) => ({ ...prev, image: compressed }));
-        showToast('Đã tải và tối ưu ảnh đại diện từ máy thành công!', 'success');
+        const cloudinaryUrl = await uploadImageToCloudinary(compressed, 'cloudmood_places');
+        setCurrentPlace((prev: any) => ({ ...prev, image: cloudinaryUrl }));
+        showToast('Đã tải ảnh lên Cloudinary thành công! Link đã tự động dán vào ô.', 'success');
       }
-    } catch (err) {
-      showToast('Lỗi khi đọc file ảnh.', 'error');
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi khi tải ảnh từ máy.', 'error');
+    } finally {
+      setUploadingThumbnail(false);
+      if (thumbnailInputRef.current) thumbnailInputRef.current.value = '';
+    }
+  };
+
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingAvatar(true);
+    setReviewError(null);
+    try {
+      showToast('Đang xử lý và tải avatar lên Cloudinary...', 'success');
+      const compressed = await compressImageFile(file, 600, 0.85);
+      if (compressed) {
+        const cloudinaryUrl = await uploadImageToCloudinary(compressed, 'cloudmood_avatars');
+        setNewReview((prev) => ({ ...prev, authorAvatar: cloudinaryUrl }));
+        showToast('Đã tải avatar lên Cloudinary thành công!', 'success');
+      }
+    } catch (err: any) {
+      setReviewError(err.message || 'Lỗi khi tải avatar từ máy.');
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = '';
     }
   };
 
@@ -234,15 +286,21 @@ export default function LocationsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setUploadingDetailPhoto(true);
+    setPhotoError(null);
     try {
+      showToast('Đang xử lý và tải ảnh lên Cloudinary...', 'success');
       const compressed = await compressImageFile(file, 1200, 0.85);
       if (compressed) {
-        setNewPhoto((prev) => ({ ...prev, urlOriginal: compressed }));
-        setPhotoError(null);
-        showToast('Đã tải và tối ưu ảnh từ máy! Bấm "Thêm ảnh" để lưu.', 'success');
+        const cloudinaryUrl = await uploadImageToCloudinary(compressed, 'cloudmood_photos');
+        setNewPhoto((prev) => ({ ...prev, urlOriginal: cloudinaryUrl }));
+        showToast('Đã tải ảnh lên Cloudinary! Bấm "Thêm ảnh" để lưu.', 'success');
       }
-    } catch (err) {
-      setPhotoError('Lỗi khi đọc file ảnh từ máy.');
+    } catch (err: any) {
+      setPhotoError(err.message || 'Lỗi khi đọc file ảnh từ máy.');
+    } finally {
+      setUploadingDetailPhoto(false);
+      if (detailPhotoInputRef.current) detailPhotoInputRef.current.value = '';
     }
   };
 
@@ -308,25 +366,24 @@ export default function LocationsPage() {
       price: '',
       categoryId: categories[0]?.id || null,
       image: '',
-      phone: '',
-      website: '',
       priceLevel: 'MODERATE',
+      rating: 5.0,
+      userRatingCount: 0,
       subCategories: [],
       subCategoriesInput: '',
       isApproved: true,
       openingHours: {
-        monday: ['08:00', '21:00'],
-        tuesday: ['08:00', '21:00'],
-        wednesday: ['08:00', '21:00'],
-        thursday: ['08:00', '21:00'],
-        friday: ['08:00', '21:00'],
-        saturday: ['08:00', '21:00'],
-        sunday: ['08:00', '21:00']
+        monday: ['07:00', '23:00'],
+        tuesday: ['07:00', '23:00'],
+        wednesday: ['07:00', '23:00'],
+        thursday: ['07:00', '23:00'],
+        friday: ['07:00', '23:00'],
+        saturday: ['07:00', '23:00'],
+        sunday: ['07:00', '23:00']
       }
     });
     setModalType('create');
-    setActiveTab('general');
-    setFormSubTab('basic');
+    setActiveTab('basic');
     setModalError(null);
     setPhotoError(null);
     setReviewError(null);
@@ -348,7 +405,7 @@ export default function LocationsPage() {
     
     // Fallback if openingHours is not set or invalid
     if (!parsedOpeningHours || typeof parsedOpeningHours !== 'object') {
-      const defaultTime = [place.openTime || '08:00', place.closeTime || '21:00'];
+      const defaultTime = [place.openTime || '07:00', place.closeTime || '23:00'];
       parsedOpeningHours = {
         monday: defaultTime,
         tuesday: defaultTime,
@@ -364,15 +421,17 @@ export default function LocationsPage() {
       ...place,
       phone: place.phone || '',
       website: place.website || '',
+      tripadvisorUrl: place.tripadvisorUrl || '',
       priceLevel: place.priceLevel || 'MODERATE',
+      rating: place.rating !== undefined && place.rating !== null ? place.rating : null,
+      userRatingCount: place.userRatingCount !== undefined && place.userRatingCount !== null ? place.userRatingCount : null,
       subCategories: place.subCategories || [],
-      subCategoriesInput: place.subCategories ? (place.subCategories as string[]).join(', ') : '',
+      subCategoriesInput: '',
       openingHours: parsedOpeningHours,
       isApproved: place.isApproved === true || place.isApproved == null,
     });
     setModalType('edit');
-    setActiveTab('general');
-    setFormSubTab('basic');
+    setActiveTab('basic');
     setModalError(null);
     setPhotoError(null);
     setReviewError(null);
@@ -394,7 +453,7 @@ export default function LocationsPage() {
       }
     }
     if (!parsedOpeningHours || typeof parsedOpeningHours !== 'object') {
-      const defaultTime = [place.openTime || '08:00', place.closeTime || '21:00'];
+      const defaultTime = [place.openTime || '07:00', place.closeTime || '23:00'];
       parsedOpeningHours = {
         monday: defaultTime,
         tuesday: defaultTime,
@@ -412,7 +471,7 @@ export default function LocationsPage() {
       website: place.website || '',
       priceLevel: place.priceLevel || 'MODERATE',
       subCategories: place.subCategories || [],
-      subCategoriesInput: place.subCategories ? (place.subCategories as string[]).join(', ') : '',
+      subCategoriesInput: '',
       openingHours: parsedOpeningHours,
     });
     setModalType('edit');
@@ -438,7 +497,7 @@ export default function LocationsPage() {
       }
     }
     if (!parsedOpeningHours || typeof parsedOpeningHours !== 'object') {
-      const defaultTime = [place.openTime || '08:00', place.closeTime || '21:00'];
+      const defaultTime = [place.openTime || '07:00', place.closeTime || '23:00'];
       parsedOpeningHours = {
         monday: defaultTime,
         tuesday: defaultTime,
@@ -456,7 +515,7 @@ export default function LocationsPage() {
       website: place.website || '',
       priceLevel: place.priceLevel || 'MODERATE',
       subCategories: place.subCategories || [],
-      subCategoriesInput: place.subCategories ? (place.subCategories as string[]).join(', ') : '',
+      subCategoriesInput: '',
       openingHours: parsedOpeningHours,
     });
     setModalType('edit');
@@ -472,6 +531,11 @@ export default function LocationsPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (uploadingThumbnail || uploadingDetailPhoto || uploadingAvatar) {
+      setModalError('Vui lòng đợi hình ảnh/avatar hoàn tất tải lên Cloudinary trước khi lưu.');
+      return;
+    }
+
     if (!currentPlace.name?.trim() || !currentPlace.address?.trim() || !currentPlace.categoryId) {
       setModalError('Vui lòng nhập đầy đủ tên, địa chỉ và chọn danh mục.');
       return;
@@ -481,8 +545,16 @@ export default function LocationsPage() {
     setModalError(null);
     try {
       const monHours = currentPlace.openingHours?.monday;
-      const openTimeVal = monHours && monHours[0] ? monHours[0] : '08:00';
-      const closeTimeVal = monHours && monHours[1] ? monHours[1] : '21:00';
+      const openTimeVal = monHours && monHours[0] ? monHours[0] : '07:00';
+      const closeTimeVal = monHours && monHours[1] ? monHours[1] : '23:00';
+
+      let computedRating = currentPlace.rating !== '' && currentPlace.rating != null ? Number(currentPlace.rating) : null;
+      if (computedRating !== null && !isNaN(computedRating)) {
+        if (computedRating > 5 && computedRating <= 50) computedRating = Number((computedRating / 10).toFixed(1));
+        else if (computedRating > 50) computedRating = 5;
+        else if (computedRating < 0) computedRating = 0;
+        else computedRating = Number(computedRating.toFixed(1));
+      }
 
       const payload = {
         name: currentPlace.name.trim(),
@@ -494,7 +566,10 @@ export default function LocationsPage() {
         image: currentPlace.image?.trim() || "",
         phone: currentPlace.phone?.trim() || null,
         website: currentPlace.website?.trim() || null,
+        tripadvisorUrl: currentPlace.tripadvisorUrl?.trim() || null,
         priceLevel: currentPlace.priceLevel || 'MODERATE',
+        rating: computedRating,
+        userRatingCount: currentPlace.userRatingCount !== '' && currentPlace.userRatingCount != null ? Number(currentPlace.userRatingCount) : null,
         openingHours: currentPlace.openingHours || null,
         subCategories: currentPlace.subCategories || [],
         price: "",
@@ -548,6 +623,11 @@ export default function LocationsPage() {
 
   const handleDeleteReview = async (reviewId: number) => {
     if (!confirm('Bạn có chắc chắn muốn xóa đánh giá này?')) return;
+    if (modalType === 'create' || !currentPlace.id) {
+      setPlaceReviews((prev) => prev.filter((r) => Number(r.id) !== reviewId));
+      showToast('Đã xóa đánh giá khỏi danh sách chờ!', 'success');
+      return;
+    }
     try {
       const res = await fetch(`/api/reviews?id=${reviewId}`, {
         method: 'DELETE',
@@ -555,7 +635,8 @@ export default function LocationsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Lỗi khi xóa đánh giá.');
       
-      setPlaceReviews(prev => prev.filter(r => Number(r.id) !== reviewId));
+      setPlaceReviews((prev) => prev.filter((r) => Number(r.id) !== reviewId));
+      fetchData();
       showToast('Xóa đánh giá thành công!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Lỗi khi xóa đánh giá.', 'error');
@@ -570,6 +651,26 @@ export default function LocationsPage() {
       return;
     }
     
+    const avatarUrl = newReview.authorAvatar.trim() || null;
+
+    if (modalType === 'create' || !currentPlace.id) {
+      const mockReview = {
+        id: Date.now(),
+        authorName: newReview.authorName.trim(),
+        authorAvatar: avatarUrl,
+        rating: newReview.rating,
+        comment: newReview.comment.trim(),
+        publishedDate: newReview.publishedDate ? new Date(newReview.publishedDate).toISOString() : new Date().toISOString(),
+        authorLocation: newReview.authorLocation.trim() || null,
+        source: 'TRIPADVISOR',
+      };
+      setPlaceReviews((prev) => [mockReview, ...prev]);
+      setNewReview({ authorName: '', authorAvatar: '', rating: 5, comment: '', publishedDate: '', authorLocation: '' });
+      setReviewError(null);
+      showToast('Đã thêm đánh giá vào danh sách chờ tạo địa điểm!', 'success');
+      return;
+    }
+
     try {
       const payload = {
         placeId: Number(currentPlace.id),
@@ -578,8 +679,8 @@ export default function LocationsPage() {
         comment: newReview.comment.trim(),
         publishedDate: newReview.publishedDate ? new Date(newReview.publishedDate).toISOString() : new Date().toISOString(),
         authorLocation: newReview.authorLocation.trim() || null,
-        source: 'LOCAL',
-        authorAvatar: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(newReview.authorName)}`
+        source: 'TRIPADVISOR',
+        authorAvatar: avatarUrl,
       };
       
       const res = await fetch(`/api/admin/places/${currentPlace.id}/reviews`, {
@@ -590,9 +691,10 @@ export default function LocationsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Lỗi khi thêm đánh giá.');
       
-      setPlaceReviews(prev => [data, ...prev]);
-      setNewReview({ authorName: '', rating: 5, comment: '', publishedDate: '', authorLocation: '' });
+      setPlaceReviews((prev) => [data, ...prev]);
+      setNewReview({ authorName: '', authorAvatar: '', rating: 5, comment: '', publishedDate: '', authorLocation: '' });
       setReviewError(null);
+      fetchData();
       showToast('Thêm đánh giá thành công!', 'success');
     } catch (err: any) {
       setReviewError(err.message || 'Lỗi khi thêm đánh giá.');
@@ -601,13 +703,18 @@ export default function LocationsPage() {
   };
 
   const handleDeletePhoto = async (photoId: number) => {
+    if (modalType === 'create' || !currentPlace.id) {
+      setPlacePhotos((prev) => prev.filter((p) => Number(p.id) !== photoId));
+      showToast('Đã xóa hình ảnh khỏi danh sách chờ!', 'success');
+      return;
+    }
     try {
       const res = await fetch(`/api/admin/places/photos/${photoId}`, {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Lỗi khi xóa ảnh.');
       
-      setPlacePhotos(prev => prev.filter(p => Number(p.id) !== photoId));
+      setPlacePhotos((prev) => prev.filter((p) => Number(p.id) !== photoId));
       showToast('Xóa hình ảnh thành công!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Lỗi khi xóa ảnh.', 'error');
@@ -627,12 +734,27 @@ export default function LocationsPage() {
       return;
     }
     
+    if (modalType === 'create' || !currentPlace.id) {
+      const mockPhoto = {
+        id: Date.now(),
+        urlOriginal: newPhoto.urlOriginal.trim(),
+        urlThumbnail: newPhoto.urlThumbnail.trim() || newPhoto.urlOriginal.trim(),
+        caption: newPhoto.caption.trim() || null,
+        source: 'LOCAL',
+      };
+      setPlacePhotos((prev) => [mockPhoto, ...prev]);
+      setNewPhoto({ urlOriginal: '', urlThumbnail: '', caption: '' });
+      setPhotoError(null);
+      showToast('Đã thêm ảnh vào bộ sưu tập chờ tạo địa điểm!', 'success');
+      return;
+    }
+
     try {
       const payload = {
         urlOriginal: newPhoto.urlOriginal.trim(),
         urlThumbnail: newPhoto.urlThumbnail.trim() || newPhoto.urlOriginal.trim(),
         caption: newPhoto.caption.trim() || null,
-        source: 'LOCAL'
+        source: 'LOCAL',
       };
       
       const res = await fetch(`/api/admin/places/${currentPlace.id}/photos`, {
@@ -643,7 +765,7 @@ export default function LocationsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Lỗi khi thêm hình ảnh.');
       
-      setPlacePhotos(prev => [data, ...prev]);
+      setPlacePhotos((prev) => [data, ...prev]);
       setNewPhoto({ urlOriginal: '', urlThumbnail: '', caption: '' });
       setPhotoError(null);
       showToast('Thêm hình ảnh thành công!', 'success');
@@ -653,6 +775,126 @@ export default function LocationsPage() {
     }
   };
 
+  const handleImportReviewsFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const text = evt.target?.result as string;
+        let parsedReviews: any[] = [];
+        if (file.name.endsWith('.json')) {
+          const json = JSON.parse(text);
+          parsedReviews = Array.isArray(json) ? json : json.reviews || [json];
+        } else {
+          const lines = text.split('\n').filter((l) => l.trim());
+          if (lines.length <= 1) throw new Error('File CSV đánh giá rỗng.');
+          const headers = parseCSVLine(lines[0]);
+          for (let i = 1; i < lines.length; i++) {
+            const values = parseCSVLine(lines[i]);
+            const row: any = {};
+            headers.forEach((h, idx) => { row[h] = values[idx]; });
+            parsedReviews.push(row);
+          }
+        }
+
+        const formatted = parsedReviews.map((r: any) => ({
+          authorName: r.authorName || r.name || 'Người dùng TripAdvisor',
+          authorAvatar: r.authorAvatar || r.avatar || null,
+          authorLocation: r.authorLocation || r.location || null,
+          rating: parseFloat(r.rating) || 5,
+          comment: r.comment || r.content || r.text || '',
+          publishedDate: r.publishedDate || r.date || new Date().toISOString(),
+          source: r.source || 'TRIPADVISOR',
+        })).filter((r) => r.comment || r.authorName);
+
+        if (formatted.length === 0) {
+          showToast('Không tìm thấy dữ liệu đánh giá hợp lệ trong file.', 'error');
+          return;
+        }
+
+        if (modalType === 'create' || !currentPlace.id) {
+          setPlaceReviews((prev) => [...formatted.map((f, idx) => ({ id: Date.now() + idx, ...f })), ...prev]);
+          showToast(`Đã nạp ${formatted.length} đánh giá vào danh sách chờ tạo địa điểm!`, 'success');
+        } else {
+          for (const rv of formatted) {
+            await fetch(`/api/admin/places/${currentPlace.id}/reviews`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...rv, placeId: Number(currentPlace.id) }),
+            });
+          }
+          fetchReviewsAndPhotos(Number(currentPlace.id));
+          showToast(`Import thành công ${formatted.length} đánh giá cho địa điểm!`, 'success');
+        }
+      } catch (err: any) {
+        showToast(err.message || 'Lỗi khi import file đánh giá.', 'error');
+      } finally {
+        e.target.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImportPhotosFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const text = evt.target?.result as string;
+        let parsedPhotos: any[] = [];
+        if (file.name.endsWith('.json')) {
+          const json = JSON.parse(text);
+          parsedPhotos = Array.isArray(json) ? json : json.photos || [json];
+        } else {
+          const lines = text.split('\n').filter((l) => l.trim());
+          if (lines.length <= 1) throw new Error('File CSV hình ảnh rỗng.');
+          const headers = parseCSVLine(lines[0]);
+          for (let i = 1; i < lines.length; i++) {
+            const values = parseCSVLine(lines[i]);
+            const row: any = {};
+            headers.forEach((h, idx) => { row[h] = values[idx]; });
+            parsedPhotos.push(row);
+          }
+        }
+
+        const formatted = parsedPhotos.map((p: any) => {
+          const url = typeof p === 'string' ? p : p.urlOriginal || p.url || p.image || '';
+          const caption = typeof p === 'object' ? p.caption || '' : '';
+          return { urlOriginal: url, caption, source: 'LOCAL' };
+        }).filter((p) => p.urlOriginal);
+
+        if (formatted.length === 0) {
+          showToast('Không tìm thấy dữ liệu hình ảnh hợp lệ trong file.', 'error');
+          return;
+        }
+
+        if (modalType === 'create' || !currentPlace.id) {
+          setPlacePhotos((prev) => [...formatted.map((f, idx) => ({ id: Date.now() + idx, ...f })), ...prev]);
+          showToast(`Đã nạp ${formatted.length} hình ảnh vào danh sách chờ tạo địa điểm!`, 'success');
+        } else {
+          for (const ph of formatted) {
+            await fetch(`/api/admin/places/${currentPlace.id}/photos`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(ph),
+            });
+          }
+          fetchReviewsAndPhotos(Number(currentPlace.id));
+          showToast(`Import thành công ${formatted.length} hình ảnh cho địa điểm!`, 'success');
+        }
+      } catch (err: any) {
+        showToast(err.message || 'Lỗi khi import file hình ảnh.', 'error');
+      } finally {
+        e.target.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const parseCSVLine = (text: string): string[] => {
     const result: string[] = [];
     let insideQuote = false;
@@ -660,7 +902,13 @@ export default function LocationsPage() {
     for (let i = 0; i < text.length; i++) {
       const char = text[i];
       if (char === '"') {
-        insideQuote = !insideQuote;
+        // Escaped double quotes inside CSV cell (represented as "")
+        if (insideQuote && i + 1 < text.length && text[i + 1] === '"') {
+          entry += '"';
+          i++; // Skip second double quote
+        } else {
+          insideQuote = !insideQuote;
+        }
       } else if (char === ',' && !insideQuote) {
         result.push(entry.trim());
         entry = '';
@@ -718,6 +966,57 @@ export default function LocationsPage() {
             subCats = p.subCategories.split(',').map((s: string) => s.trim()).filter(Boolean);
           }
 
+          let photosToImport: any[] = [];
+          if (Array.isArray(p.photos)) {
+            photosToImport = p.photos;
+          } else if (typeof p.photos === 'string' && p.photos.trim()) {
+            try {
+              const parsed = JSON.parse(p.photos);
+              if (Array.isArray(parsed)) photosToImport = parsed;
+              else photosToImport = [p.photos.trim()];
+            } catch {
+              photosToImport = p.photos.split(/[;,]/).map((url: string) => url.trim()).filter(Boolean);
+            }
+          }
+
+          let reviewsToImport: any[] = [];
+          if (Array.isArray(p.reviews)) {
+            reviewsToImport = p.reviews;
+          } else if (typeof p.reviews === 'string' && p.reviews.trim()) {
+            const rawRev = p.reviews.trim();
+            try {
+              const parsed = JSON.parse(rawRev);
+              if (Array.isArray(parsed)) reviewsToImport = parsed;
+              else if (typeof parsed === 'object') reviewsToImport = [parsed];
+            } catch {
+              try {
+                const fixedJsonStr = rawRev.replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":');
+                const parsed = JSON.parse(fixedJsonStr);
+                if (Array.isArray(parsed)) reviewsToImport = parsed;
+                else if (typeof parsed === 'object') reviewsToImport = [parsed];
+              } catch {
+                if (rawRev && !rawRev.startsWith('[')) {
+                  reviewsToImport = [{ comment: rawRev, rating: 5 }];
+                }
+              }
+            }
+          }
+
+          const normalizePriceLevel = (val: any): string => {
+            if (!val) return 'MODERATE';
+            const str = String(val).trim().toUpperCase();
+            if (['FREE', '$', '$$', 'MODERATE', '$$$', '$$ - $$$$', '$$$$'].includes(str)) {
+              return str;
+            }
+            if (str === 'INEXPENSIVE' || str === 'CHEAP' || str === '1') return '$';
+            if (str === '2') return '$$';
+            if (str === '3') return '$$$';
+            if (str === '4') return '$$$$';
+            if (str === '$$ - $$$' || str === '$$ - $$$$') return '$$ - $$$$';
+            if (str.includes('FREE') || str.includes('MIỄN PHÍ')) return 'FREE';
+            return 'MODERATE';
+          };
+
           let opHours: any = null;
           if (p.openingHours) {
             if (typeof p.openingHours === 'object') {
@@ -727,41 +1026,48 @@ export default function LocationsPage() {
                 opHours = JSON.parse(p.openingHours);
               } catch {
                 opHours = {
-                  monday: ["08:00", "21:00"],
-                  tuesday: ["08:00", "21:00"],
-                  wednesday: ["08:00", "21:00"],
-                  thursday: ["08:00", "21:00"],
-                  friday: ["08:00", "21:00"],
-                  saturday: ["08:00", "21:00"],
-                  sunday: ["08:00", "21:00"]
+                  monday: ["07:00", "23:00"],
+                  tuesday: ["07:00", "23:00"],
+                  wednesday: ["07:00", "23:00"],
+                  thursday: ["07:00", "23:00"],
+                  friday: ["07:00", "23:00"],
+                  saturday: ["07:00", "23:00"],
+                  sunday: ["07:00", "23:00"]
                 };
               }
             }
           } else {
             opHours = {
-              monday: [p.openTime || "08:00", p.closeTime || "21:00"],
-              tuesday: [p.openTime || "08:00", p.closeTime || "21:00"],
-              wednesday: [p.openTime || "08:00", p.closeTime || "21:00"],
-              thursday: [p.openTime || "08:00", p.closeTime || "21:00"],
-              friday: [p.openTime || "08:00", p.closeTime || "21:00"],
-              saturday: [p.openTime || "08:00", p.closeTime || "21:00"],
-              sunday: [p.openTime || "08:00", p.closeTime || "21:00"]
+              monday: [p.openTime || "07:00", p.closeTime || "23:00"],
+              tuesday: [p.openTime || "07:00", p.closeTime || "23:00"],
+              wednesday: [p.openTime || "07:00", p.closeTime || "23:00"],
+              thursday: [p.openTime || "07:00", p.closeTime || "23:00"],
+              friday: [p.openTime || "07:00", p.closeTime || "23:00"],
+              saturday: [p.openTime || "07:00", p.closeTime || "23:00"],
+              sunday: [p.openTime || "07:00", p.closeTime || "23:00"]
             };
           }
 
+          const firstPhotoUrl = photosToImport.length > 0 ? (typeof photosToImport[0] === 'string' ? photosToImport[0] : photosToImport[0]?.urlOriginal || '') : '';
+
           return {
             name: p.name?.toString() || 'Chưa đặt tên',
-            description: p.description?.toString() || "",
+            description: p.description?.toString() || (p.name ? `Địa điểm ${p.name} tuyệt vời tại Cần Thơ` : ''),
             latitude: parseFloat(p.latitude) || 10.03022,
             longitude: parseFloat(p.longitude) || 105.78753,
             address: p.address?.toString() || 'Chưa có địa chỉ',
             categoryId: catId,
-            image: p.image?.toString() || '',
+            image: p.image?.toString() || firstPhotoUrl,
             phone: p.phone?.toString() || null,
             website: p.website?.toString() || null,
-            priceLevel: p.priceLevel || 'MODERATE',
+            tripadvisorUrl: p.tripadvisorUrl?.toString() || null,
+            priceLevel: normalizePriceLevel(p.priceLevel),
+            rating: p.rating !== undefined && p.rating !== null ? parseFloat(p.rating) : null,
+            userRatingCount: p.userRatingCount !== undefined && p.userRatingCount !== null ? parseInt(p.userRatingCount) : null,
             openingHours: opHours,
             subCategories: subCats,
+            photos: photosToImport,
+            reviews: reviewsToImport,
             price: ""
           };
         });
@@ -778,10 +1084,11 @@ export default function LocationsPage() {
         showToast(`Import thành công ${data.importedCount} địa điểm!`, 'success');
       } catch (err: any) {
         showToast(err.message || 'Lỗi khi import file.', 'error');
+      } finally {
+        e.target.value = '';
       }
     };
     reader.readAsText(file);
-    e.target.value = '';
   };
 
   const handleOpenDelete = (id: number) => {
@@ -806,6 +1113,29 @@ export default function LocationsPage() {
     } finally {
       setDeleteLoading(false);
       setDeletingId(null);
+    }
+  };
+
+  const handleToggleApprove = async (id: number, currentApprovedState: boolean | null | undefined) => {
+    const newStatus = currentApprovedState === true ? false : true;
+    try {
+      const res = await fetch(`/api/admin/places/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isApproved: newStatus }),
+      });
+      if (!res.ok) throw new Error('Không thể cập nhật trạng thái địa điểm.');
+      setPlaces((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, isApproved: newStatus } : p))
+      );
+      showToast(
+        newStatus
+          ? 'Đã duyệt & hiển thị địa điểm lên App Mobile!'
+          : 'Đã ẩn địa điểm khỏi App Mobile (Hình ảnh & đánh giá vẫn bảo toàn)!',
+        'success'
+      );
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi khi cập nhật trạng thái.', 'error');
     }
   };
 
@@ -849,11 +1179,11 @@ export default function LocationsPage() {
       selectedSubCategoryFilter === 'all' || 
       (Array.isArray(subCats) && subCats.includes(selectedSubCategoryFilter));
 
-    const isApprovedVal = p.isApproved === true || p.isApproved == null;
     const matchesApproval =
       approvalFilter === 'all' ||
-      (approvalFilter === 'approved' && isApprovedVal) ||
-      (approvalFilter === 'pending' && !isApprovedVal);
+      (approvalFilter === 'approved' && p.isApproved === true) ||
+      (approvalFilter === 'pending' && p.isApproved === null) ||
+      (approvalFilter === 'hidden' && p.isApproved === false);
 
     return matchesSearch && matchesCategory && matchesSubCategory && matchesApproval;
   });
@@ -938,7 +1268,7 @@ export default function LocationsPage() {
                 type="text"
                 placeholder="Tìm tên hoặc địa chỉ..."
                 value={searchQuery}
-                onChange={(e) => startTransition(() => setSearchQuery(e.target.value))}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="bg-white text-gray-900 text-sm rounded-lg pl-10 pr-4 py-2 border border-gray-200 focus:outline-none focus:border-blue-500 transition-colors w-full"
               />
             </div>
@@ -974,18 +1304,19 @@ export default function LocationsPage() {
                 </option>
               ))}
             </select>
-            {/* Approval Filter */}
+            {/* Approval / Status Filter */}
             <select
               value={approvalFilter}
               onChange={(e) => {
                 const val = e.target.value;
                 startFilterTransition(() => setApprovalFilter(val));
               }}
-              className="bg-white text-gray-700 text-sm rounded-lg px-3 py-2 border border-gray-200 focus:outline-none focus:border-blue-500 w-full sm:w-48 cursor-pointer font-medium"
+              className="bg-white text-gray-700 text-sm rounded-lg px-3 py-2 border border-gray-200 focus:outline-none focus:border-blue-500 w-full sm:w-48 cursor-pointer font-medium shadow-2xs"
             >
               <option value="all">Tất cả trạng thái</option>
               <option value="approved">Đã duyệt</option>
               <option value="pending">Chờ duyệt</option>
+              <option value="hidden">Đã ẩn</option>
             </select>
           </div>
           <div className="text-sm text-gray-500 font-medium">
@@ -1015,6 +1346,7 @@ export default function LocationsPage() {
                 <tr className="text-gray-500 bg-gray-50 border-b border-gray-200 font-semibold uppercase tracking-wider">
                   <th className="px-6 py-4">Địa điểm</th>
                   <th className="px-6 py-4">Danh mục</th>
+                  <th className="px-6 py-4">Đánh giá</th>
                   <th className="px-6 py-4">Địa chỉ & Tọa độ</th>
                   <th className="px-6 py-4">Mức giá & Giờ mở</th>
                   <th className="px-6 py-4">Trạng thái</th>
@@ -1051,6 +1383,19 @@ export default function LocationsPage() {
                           {catName}
                         </span>
                       </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1">
+                            <Star size={14} className="fill-amber-400 text-amber-400 shrink-0" />
+                            <span className="font-bold text-gray-900 text-xs">
+                              {place.rating != null && place.rating > 0 ? Number(place.rating).toFixed(1) : 'Chưa có'}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-gray-500 font-medium">
+                            {(place.userRatingCount ?? place._count?.reviews ?? 0).toLocaleString('vi-VN')} đánh giá
+                          </span>
+                        </div>
+                      </td>
                       <td className="px-6 py-4 max-w-xs">
                         <p className="text-gray-900 text-xs truncate">{cleanAddress(place.address)}</p>
                         <div className="flex items-center gap-1.5 text-gray-500 text-[10px] mt-1 font-mono">
@@ -1063,17 +1408,20 @@ export default function LocationsPage() {
                         <div className="mb-1">
                           <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg border ${
                             place.priceLevel === 'FREE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                            (place.priceLevel === 'INEXPENSIVE' || place.priceLevel === 'CHEAP') ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                            place.priceLevel === 'MODERATE' ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                            place.priceLevel === 'EXPENSIVE' ? 'bg-pink-50 text-pink-700 border-pink-200' :
-                            (place.priceLevel === 'VERY_EXPENSIVE' || place.priceLevel === 'VERY_EXP') ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                            (place.priceLevel === '$' || place.priceLevel === 'INEXPENSIVE' || place.priceLevel === 'CHEAP') ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                            (place.priceLevel === '$$' || place.priceLevel === 'MODERATE') ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                            place.priceLevel === '$$$' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                            place.priceLevel === '$$ - $$$$' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                            (place.priceLevel === '$$$$' || place.priceLevel === 'VERY_EXPENSIVE' || place.priceLevel === 'EXPENSIVE') ? 'bg-purple-50 text-purple-700 border-purple-200' :
                             'bg-gray-50 text-gray-700 border-gray-200'
                           }`}>
-                            {place.priceLevel === 'FREE' ? 'Miễn phí' :
-                             (place.priceLevel === 'INEXPENSIVE' || place.priceLevel === 'CHEAP') ? 'Giá rẻ' :
-                             place.priceLevel === 'MODERATE' ? 'Trung bình' :
-                             place.priceLevel === 'EXPENSIVE' ? 'Cao cấp' :
-                             (place.priceLevel === 'VERY_EXPENSIVE' || place.priceLevel === 'VERY_EXP') ? 'Rất cao cấp' : 'Trung bình'}
+                            {place.priceLevel === 'FREE' ? 'Miễn phí (FREE)' :
+                             (place.priceLevel === '$' || place.priceLevel === 'INEXPENSIVE' || place.priceLevel === 'CHEAP') ? 'Giá rẻ ($)' :
+                             place.priceLevel === '$$' ? 'Vừa phải ($$)' :
+                             place.priceLevel === 'MODERATE' ? 'Trung bình (MODERATE)' :
+                             place.priceLevel === '$$$' ? 'Cao cấp ($$$)' :
+                             place.priceLevel === '$$ - $$$$' ? 'Tầm trung - cao cấp ($$ - $$$$)' :
+                             (place.priceLevel === '$$$$' || place.priceLevel === 'VERY_EXPENSIVE' || place.priceLevel === 'EXPENSIVE') ? 'Rất cao cấp ($$$$)' : (place.priceLevel || 'MODERATE')}
                           </span>
                         </div>
                         <p className="text-gray-500 text-[10px] mt-1">
@@ -1081,33 +1429,79 @@ export default function LocationsPage() {
                         </p>
                       </td>
                       <td className="px-6 py-4">
-                        {place.isApproved === false ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                            Chờ duyệt
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {place.isApproved === true ? (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleApprove(Number(place.id), place.isApproved)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-all cursor-pointer shadow-2xs hover:scale-105"
+                            title="Click để Ẩn địa điểm khỏi App Mobile"
+                          >
+                            <Eye size={13} />
                             Đã duyệt
-                          </span>
+                          </button>
+                        ) : place.isApproved === false ? (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleApprove(Number(place.id), place.isApproved)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 transition-all cursor-pointer shadow-2xs hover:scale-105"
+                            title="Click để Mở ẩn & Duyệt địa điểm"
+                          >
+                            <EyeOff size={13} />
+                            Đã ẩn
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleApprove(Number(place.id), place.isApproved)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-all cursor-pointer shadow-2xs hover:scale-105"
+                            title="Click để Duyệt địa điểm này"
+                          >
+                            <Check size={13} />
+                            Chờ duyệt
+                          </button>
                         )}
                       </td>
                       <td className="px-6 py-4 text-right space-x-1 shrink-0">
-                        {place.isApproved === false && (
+                        {place.isApproved === null && (
                           <button
-                            onClick={() => handleApprovePlace(Number(place.id))}
-                            className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
+                            onClick={() => handleToggleApprove(Number(place.id), place.isApproved)}
+                            className="p-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
                             title="Duyệt địa điểm"
                           >
                             <Check size={16} />
                           </button>
                         )}
-                        {!!(place.latitude && place.longitude) && (
+                        {place.isApproved === true && (
+                          <button
+                            onClick={() => handleToggleApprove(Number(place.id), place.isApproved)}
+                            className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
+                            title="Ẩn địa điểm khỏi App Mobile"
+                          >
+                            <Eye size={16} />
+                          </button>
+                        )}
+                        {place.isApproved === false && (
+                          <button
+                            onClick={() => handleToggleApprove(Number(place.id), place.isApproved)}
+                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer inline-flex items-center"
+                            title="Mở ẩn & Duyệt địa điểm"
+                          >
+                            <EyeOff size={16} />
+                          </button>
+                        )}
+                        {Boolean(place.name || (place.latitude && place.longitude)) && (
                           <a
-                            href={`https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}`}
+                            href={
+                              place.name
+                                ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                                    `${place.name}${place.address ? ', ' + cleanAddress(place.address) : ''}`
+                                  )}`
+                                : `https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}`
+                            }
                             target="_blank"
                             rel="noopener noreferrer"
                             className="p-2 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
-                            title="Xem bản đồ"
+                            title={`Xem "${place.name}" trên Google Maps`}
                           >
                             <ExternalLink size={16} />
                           </a>
@@ -1191,12 +1585,12 @@ export default function LocationsPage() {
       {/* Import File Formatting Guide Modal */}
       {showImportHelp && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-205">
-          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-6xl w-full overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-205">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-5xl w-full overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-205">
             {/* Modal Header */}
             <div className="p-5 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
               <div className="flex items-center gap-2">
                 <Info size={20} className="text-blue-600" />
-                <h3 className="text-lg font-bold text-gray-900">Hướng dẫn định dạng file import</h3>
+                <h3 className="text-lg font-bold text-gray-900">Hướng dẫn định dạng file Import Địa điểm</h3>
               </div>
               <button 
                 onClick={() => setShowImportHelp(false)}
@@ -1207,58 +1601,73 @@ export default function LocationsPage() {
             </div>
 
             {/* Modal Content */}
-            <div className="p-6 overflow-y-auto space-y-5 text-sm text-gray-600">
+            <div className="p-6 overflow-y-auto space-y-6 text-sm text-gray-600">
               <div>
-                <p className="font-semibold text-gray-900 mb-1.5">1. Các trường thông tin hỗ trợ:</p>
+                <p className="font-bold text-gray-900 mb-2">1. Danh sách các trường thông tin hỗ trợ cho Địa điểm:</p>
                 <div className="overflow-x-auto border border-gray-200 rounded-xl">
                   <table className="min-w-full divide-y divide-gray-200 text-xs">
                     <thead className="bg-gray-50 font-semibold text-gray-700">
                       <tr>
-                        <th className="px-3 py-2 text-left">Trường (JSON Key / CSV Header)</th>
+                        <th className="px-3 py-2 text-left">Cột / Trường (CSV Header hoặc JSON Key)</th>
                         <th className="px-3 py-2 text-left">Kiểu</th>
                         <th className="px-3 py-2 text-left">Mô tả &amp; Ví dụ</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200 bg-white text-gray-600">
+                    <tbody className="divide-y divide-gray-200 bg-white text-gray-600 font-medium">
                       <tr>
-                        <td className="px-3 py-2 font-mono text-blue-600 font-semibold">name</td>
+                        <td className="px-3 py-2 font-mono text-blue-600 font-bold">name</td>
                         <td className="px-3 py-2">Chuỗi (Bắt buộc)</td>
-                        <td className="px-3 py-2">Tên địa điểm. VD: <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800">Yaki House Buffet</code></td>
+                        <td className="px-3 py-2">Tên địa điểm. VD: <code className="bg-gray-100 px-1 py-0.5 rounded">Yaki House Buffet</code></td>
                       </tr>
                       <tr>
-                        <td className="px-3 py-2 font-mono text-blue-600 font-semibold">address</td>
+                        <td className="px-3 py-2 font-mono text-blue-600 font-bold">address</td>
                         <td className="px-3 py-2">Chuỗi (Bắt buộc)</td>
-                        <td className="px-3 py-2">Địa chỉ. VD: <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800">123 Đường 3/2, Cần Thơ</code></td>
+                        <td className="px-3 py-2">Địa chỉ chi tiết. VD: <code className="bg-gray-100 px-1 py-0.5 rounded">123 Đường 3/2, Ninh Kiều, Cần Thơ</code></td>
                       </tr>
                       <tr>
-                        <td className="px-3 py-2 font-mono text-blue-600 font-semibold">categoryName</td>
+                        <td className="px-3 py-2 font-mono text-blue-600 font-bold">categoryName</td>
                         <td className="px-3 py-2">Chuỗi</td>
-                        <td className="px-3 py-2">Danh mục chính (trùng khớp trong CSDL). VD: <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800">Quán ăn</code></td>
+                        <td className="px-3 py-2">Tên danh mục chính (khớp trong CSDL). VD: <code className="bg-gray-100 px-1 py-0.5 rounded">Quán ăn</code></td>
                       </tr>
                       <tr>
-                        <td className="px-3 py-2 font-mono text-blue-600 font-semibold">latitude / longitude</td>
+                        <td className="px-3 py-2 font-mono text-blue-600 font-bold">latitude / longitude</td>
                         <td className="px-3 py-2">Số thập phân</td>
-                        <td className="px-3 py-2">Tọa độ. VD: <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800">10.035425</code> / <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800">105.779507</code></td>
+                        <td className="px-3 py-2">Tọa độ vị trí. VD: <code className="bg-gray-100 px-1 py-0.5 rounded">10.035425</code> / <code className="bg-gray-100 px-1 py-0.5 rounded">105.779507</code></td>
                       </tr>
                       <tr>
-                        <td className="px-3 py-2 font-mono text-blue-600 font-semibold">phone / website</td>
+                        <td className="px-3 py-2 font-mono text-blue-600 font-bold">priceLevel</td>
                         <td className="px-3 py-2">Chuỗi</td>
-                        <td className="px-3 py-2">Số điện thoại hoặc website. VD: <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800">02923890123</code></td>
+                        <td className="px-3 py-2">Mức giá: <code className="bg-gray-100 px-1 py-0.5 rounded">FREE</code>, <code className="bg-gray-100 px-1 py-0.5 rounded">$</code>, <code className="bg-gray-100 px-1 py-0.5 rounded">MODERATE</code> (hoặc <code className="bg-gray-100 px-1 py-0.5 rounded">$$ - $$$$</code>), <code className="bg-gray-100 px-1 py-0.5 rounded">$$$$</code></td>
                       </tr>
                       <tr>
-                        <td className="px-3 py-2 font-mono text-blue-600 font-semibold">priceLevel</td>
+                        <td className="px-3 py-2 font-mono text-blue-600 font-bold">phone / website / tripadvisorUrl</td>
                         <td className="px-3 py-2">Chuỗi</td>
-                        <td className="px-3 py-2">Mức giá: <code className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-850">FREE</code>, <code className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-850">INEXPENSIVE</code>, <code className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-850">MODERATE</code>, <code className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-850">EXPENSIVE</code>, <code className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-850">VERY_EXPENSIVE</code></td>
+                        <td className="px-3 py-2">Số điện thoại, website hoặc link TripAdvisor. VD: <code className="bg-gray-100 px-1 py-0.5 rounded">02923890123</code></td>
                       </tr>
                       <tr>
-                        <td className="px-3 py-2 font-mono text-blue-600 font-semibold">subCategories</td>
+                        <td className="px-3 py-2 font-mono text-blue-600 font-bold">rating / userRatingCount</td>
+                        <td className="px-3 py-2">Số</td>
+                        <td className="px-3 py-2">Điểm đánh giá trung bình &amp; Số lượt đánh giá. VD: <code className="bg-gray-100 px-1 py-0.5 rounded">4.5</code> / <code className="bg-gray-100 px-1 py-0.5 rounded">120</code></td>
+                      </tr>
+                      <tr>
+                        <td className="px-3 py-2 font-mono text-blue-600 font-bold">subCategories</td>
+                        <td className="px-3 py-2">Chuỗi / Mảng</td>
+                        <td className="px-3 py-2">Danh mục phụ, phân cách bằng dấu phẩy. VD: <code className="bg-gray-100 px-1 py-0.5 rounded">Buffet, Lẩu nướng</code></td>
+                      </tr>
+                      <tr>
+                        <td className="px-3 py-2 font-mono text-blue-600 font-bold">photos</td>
                         <td className="px-3 py-2">Mảng/Chuỗi</td>
-                        <td className="px-3 py-2">Danh mục phụ, cách bởi dấu phẩy. VD: <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800">Buffet, Lẩu nướng</code></td>
+                        <td className="px-3 py-2">Danh sách URL hình ảnh phụ. VD: <code className="bg-gray-100 px-1 py-0.5 rounded">["https://.../photo1.jpg"]</code></td>
                       </tr>
                       <tr>
-                        <td className="px-3 py-2 font-mono text-blue-600 font-semibold">openTime / closeTime</td>
-                        <td className="px-3 py-2">Chuỗi (HH:MM)</td>
-                        <td className="px-3 py-2">Giờ mở / đóng cửa mặc định. VD: <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800">08:00</code> &amp; <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800">22:00</code></td>
+                        <td className="px-3 py-2 font-mono text-blue-600 font-bold">reviews</td>
+                        <td className="px-3 py-2">Mảng đối tượng</td>
+                        <td className="px-3 py-2">Danh sách nhận xét của khách hàng. VD: <code className="bg-gray-100 px-1 py-0.5 rounded">[&#123;"authorName": "A", "rating": 5, "comment": "Tốt"&#125;]</code></td>
+                      </tr>
+                      <tr>
+                        <td className="px-3 py-2 font-mono text-blue-600 font-bold">openingHours (hoặc openTime / closeTime)</td>
+                        <td className="px-3 py-2">JSONB / Chuỗi (HH:MM)</td>
+                        <td className="px-3 py-2">Giờ hoạt động. CSDL lưu dạng cột <code className="bg-gray-100 px-1 py-0.5 rounded">openingHours</code> (jsonb). Khi import có thể dùng đối tượng <code className="bg-gray-100 px-1 py-0.5 rounded">openingHours</code> hoặc 2 cột tiện ích <code className="bg-gray-100 px-1 py-0.5 rounded">openTime</code> &amp; <code className="bg-gray-100 px-1 py-0.5 rounded">closeTime</code> (VD: <code className="bg-gray-100 px-1 py-0.5 rounded">08:00</code> &amp; <code className="bg-gray-100 px-1 py-0.5 rounded">22:00</code>)</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1266,32 +1675,43 @@ export default function LocationsPage() {
               </div>
 
               <div>
-                <p className="font-semibold text-gray-900 mb-1.5">2. Ví dụ file JSON (.json):</p>
-                <pre className="bg-gray-900 text-gray-100 p-4 rounded-xl text-xs font-mono overflow-x-auto">
-{`[
-  {
-    "name": "Yaki House Buffet",
-    "description": "Buffet lẩu nướng đa dạng món ăn",
-    "address": "123 Đường 3/2, Ninh Kiều, Cần Thơ",
-    "categoryName": "Quán ăn",
-    "latitude": 10.035425,
-    "longitude": 105.779507,
-    "phone": "02923890123",
-    "website": "https://yakihouse.vn",
-    "priceLevel": "MODERATE",
-    "subCategories": ["Buffet", "Lẩu nướng"],
-    "openTime": "08:00",
-    "closeTime": "22:00"
-  }
-]`}
+                <p className="font-bold text-gray-900 mb-2">2. Ví dụ file CSV chuẩn (.csv):</p>
+                <pre className="bg-gray-900 text-gray-100 p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed border border-gray-800">
+{`name,address,categoryName,latitude,longitude,phone,website,priceLevel,rating,userRatingCount,subCategories,photos,openTime,closeTime
+Yaki House Buffet,123 Đường 3/2 Cần Thơ,Quán ăn,10.035425,105.779507,02923890123,https://yakihouse.vn,$$ - $$$$,4.5,120,"Buffet, Lẩu nướng","https://example.com/photo1.jpg, https://example.com/photo2.jpg",08:00,22:00
+Lúa Nếp Restaurant,Khu bãi bồi Ninh Kiều Cần Thơ,Quán ăn,10.029810,105.789120,02923888999,https://luanep.vn,MODERATE,4.8,210,"Đặc sản miền Tây, Sân vườn","https://example.com/photo3.jpg",07:00,23:00`}
                 </pre>
               </div>
 
               <div>
-                <p className="font-semibold text-gray-900 mb-1.5">3. Ví dụ file CSV (.csv):</p>
-                <pre className="bg-gray-900 text-gray-100 p-4 rounded-xl text-xs font-mono overflow-x-auto">
-{`name,description,address,categoryName,latitude,longitude,phone,website,priceLevel,subCategories,openTime,closeTime
-Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,10.035425,105.779507,02923890123,https://yakihouse.vn,MODERATE,"Buffet, Lẩu nướng",08:00,22:00`}
+                <p className="font-bold text-gray-900 mb-2">3. Ví dụ file JSON tổng hợp chứa cả Ảnh &amp; Đánh giá (.json):</p>
+                <pre className="bg-gray-900 text-gray-100 p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed border border-gray-800">
+{`[
+  {
+    "name": "Yaki House Buffet",
+    "address": "123 Đường 3/2, Ninh Kiều, Cần Thơ",
+    "categoryName": "Quán ăn",
+    "latitude": 10.035425,
+    "longitude": 105.779507,
+    "priceLevel": "$$ - $$$$",
+    "rating": 4.5,
+    "userRatingCount": 120,
+    "subCategories": ["Buffet", "Lẩu nướng"],
+    "photos": [
+      "https://res.cloudinary.com/demo/image/upload/sample.jpg"
+    ],
+    "reviews": [
+      {
+        "authorName": "Nguyễn Văn A",
+        "rating": 5,
+        "comment": "Món ăn tuyệt vời, phục vụ tận tình!",
+        "publishedDate": "2026-01-20"
+      }
+    ],
+    "openTime": "08:00",
+    "closeTime": "22:00"
+  }
+]`}
                 </pre>
               </div>
             </div>
@@ -1309,70 +1729,275 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
           </div>
         </div>
       )}
-
-      {/* Add / Edit Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white rounded-xl max-w-[96%] xl:max-w-[1500px] w-full shadow-xl overflow-hidden border border-gray-100 my-3">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-150 bg-gray-50">
-              <h3 className="font-bold text-gray-900 text-lg">
-                {modalType === 'create'
-                  ? 'Thêm địa điểm mới'
-                  : activeTab === 'general'
-                  ? `Chỉnh sửa địa điểm: ${currentPlace.name || ''}`
-                  : activeTab === 'reviews'
-                  ? `Quản lý Đánh giá: ${currentPlace.name || ''}`
-                  : `Quản lý Hình ảnh: ${currentPlace.name || ''}`}
-              </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
-                <X size={20} />
+      {/* Import Reviews Formatting Guide Modal */}
+      {showReviewsImportHelp && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-4xl w-full overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="p-5 border-b border-gray-200 flex justify-between items-center bg-amber-50/50">
+              <div className="flex items-center gap-2">
+                <Info size={20} className="text-amber-600" />
+                <h3 className="text-lg font-bold text-gray-900">Hướng dẫn định dạng file Import Đánh giá</h3>
+              </div>
+              <button 
+                onClick={() => setShowReviewsImportHelp(false)}
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1.5 rounded-lg transition-colors cursor-pointer"
+              >
+                <X size={18} />
               </button>
             </div>
 
-            {/* Tab 1: General Info (Split into 2 Sub-Tabs) */}
-            {(activeTab === 'general' || modalType === 'create') && (
-              <form onSubmit={handleSave} className="p-5 space-y-4 max-h-[85vh] overflow-y-auto">
+            <div className="p-6 overflow-y-auto space-y-5 text-sm text-gray-600">
+              <div>
+                <p className="font-semibold text-gray-900 mb-1.5">1. Các trường hỗ trợ cho Đánh giá (JSON & CSV):</p>
+                <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                  <table className="min-w-full divide-y divide-gray-200 text-xs">
+                    <thead className="bg-gray-50 font-semibold text-gray-700">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Trường (JSON / CSV Header)</th>
+                        <th className="px-3 py-2 text-left">Kiểu</th>
+                        <th className="px-3 py-2 text-left">Mô tả &amp; Ví dụ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white text-gray-600 font-medium">
+                      <tr>
+                        <td className="px-3 py-2 font-mono text-amber-700 font-bold">authorName</td>
+                        <td className="px-3 py-2">Chuỗi (Bắt buộc)</td>
+                        <td className="px-3 py-2">Tên người đánh giá. VD: <code className="bg-gray-100 px-1 py-0.5 rounded">Nguyễn Văn A</code></td>
+                      </tr>
+                      <tr>
+                        <td className="px-3 py-2 font-mono text-amber-700 font-bold">rating</td>
+                        <td className="px-3 py-2">Số (1 - 5)</td>
+                        <td className="px-3 py-2">Số sao đánh giá từ 1 đến 5. VD: <code className="bg-gray-100 px-1 py-0.5 rounded">5</code></td>
+                      </tr>
+                      <tr>
+                        <td className="px-3 py-2 font-mono text-amber-700 font-bold">comment</td>
+                        <td className="px-3 py-2">Chuỗi (Bắt buộc)</td>
+                        <td className="px-3 py-2">Nội dung nhận xét. VD: <code className="bg-gray-100 px-1 py-0.5 rounded">Món ăn ngon, phục vụ tận tình</code></td>
+                      </tr>
+                      <tr>
+                        <td className="px-3 py-2 font-mono text-amber-700 font-bold">authorAvatar</td>
+                        <td className="px-3 py-2">Chuỗi (URL)</td>
+                        <td className="px-3 py-2">Link ảnh avatar (Tùy chọn). VD: <code className="bg-gray-100 px-1 py-0.5 rounded">https://.../avatar.jpg</code></td>
+                      </tr>
+                      <tr>
+                        <td className="px-3 py-2 font-mono text-amber-700 font-bold">authorLocation</td>
+                        <td className="px-3 py-2">Chuỗi</td>
+                        <td className="px-3 py-2">Quê quán/Vị trí (Tùy chọn). VD: <code className="bg-gray-100 px-1 py-0.5 rounded">Hà Nội, Việt Nam</code></td>
+                      </tr>
+                      <tr>
+                        <td className="px-3 py-2 font-mono text-amber-700 font-bold">source</td>
+                        <td className="px-3 py-2">Chuỗi</td>
+                        <td className="px-3 py-2">Nguồn: <code className="bg-gray-100 px-1 py-0.5 rounded">TRIPADVISOR</code> hoặc <code className="bg-gray-100 px-1 py-0.5 rounded">LOCAL</code></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div>
+                <p className="font-bold text-gray-900 mb-2">2. Ví dụ file CSV chuẩn (.csv):</p>
+                <pre className="bg-gray-900 text-amber-100 p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed border border-gray-800">
+{`authorName,rating,comment,authorAvatar,authorLocation,source
+Nguyễn Văn A,5,"Món ăn tuyệt vời!",https://example.com/avatar.jpg,Hà Nội,TRIPADVISOR
+Trần Thị B,4,"Dịch vụ chu đáo",,TP.HCM,LOCAL`}
+                </pre>
+              </div>
+
+              <div>
+                <p className="font-bold text-gray-900 mb-2">3. Ví dụ file JSON chuẩn (.json):</p>
+                <pre className="bg-gray-900 text-amber-100 p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed border border-gray-800">
+{`[
+  {
+    "authorName": "Nguyễn Văn A",
+    "authorAvatar": "https://example.com/avatar.jpg",
+    "authorLocation": "Hà Nội, Việt Nam",
+    "rating": 5,
+    "comment": "Món ăn tuyệt vời, không gian cực kỳ đẹp!",
+    "publishedDate": "2026-01-20",
+    "source": "TRIPADVISOR"
+  }
+]`}
+                </pre>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowReviewsImportHelp(false)}
+                className="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm rounded-xl transition-colors cursor-pointer shadow-xs"
+              >
+                Đã hiểu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Photos Formatting Guide Modal */}
+      {showPhotosImportHelp && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-4xl w-full overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="p-5 border-b border-gray-200 flex justify-between items-center bg-purple-50/50">
+              <div className="flex items-center gap-2">
+                <Info size={20} className="text-purple-600" />
+                <h3 className="text-lg font-bold text-gray-900">Hướng dẫn định dạng file Import Hình ảnh</h3>
+              </div>
+              <button 
+                onClick={() => setShowPhotosImportHelp(false)}
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1.5 rounded-lg transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-5 text-sm text-gray-600">
+              <div>
+                <p className="font-semibold text-gray-900 mb-1.5">1. Các trường hỗ trợ cho Hình ảnh (JSON & CSV):</p>
+                <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                  <table className="min-w-full divide-y divide-gray-200 text-xs">
+                    <thead className="bg-gray-50 font-semibold text-gray-700">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Trường (JSON / CSV Header)</th>
+                        <th className="px-3 py-2 text-left">Kiểu</th>
+                        <th className="px-3 py-2 text-left">Mô tả &amp; Ví dụ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white text-gray-600 font-medium">
+                      <tr>
+                        <td className="px-3 py-2 font-mono text-purple-700 font-bold">urlOriginal</td>
+                        <td className="px-3 py-2">Chuỗi (URL Bắt buộc)</td>
+                        <td className="px-3 py-2">Đường dẫn ảnh. VD: <code className="bg-gray-100 px-1 py-0.5 rounded">https://res.cloudinary.com/.../photo.jpg</code></td>
+                      </tr>
+                      <tr>
+                        <td className="px-3 py-2 font-mono text-purple-700 font-bold">caption</td>
+                        <td className="px-3 py-2">Chuỗi (Tùy chọn)</td>
+                        <td className="px-3 py-2">Chú thích hình ảnh. VD: <code className="bg-gray-100 px-1 py-0.5 rounded">Không gian tầng 1</code></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div>
+                <p className="font-bold text-gray-900 mb-2">2. Ví dụ file CSV chuẩn (.csv):</p>
+                <pre className="bg-gray-900 text-purple-100 p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed border border-gray-800">
+{`urlOriginal,caption
+https://res.cloudinary.com/demo/image/upload/photo1.jpg,Không gian tầng 1
+https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
+                </pre>
+              </div>
+
+              <div>
+                <p className="font-bold text-gray-900 mb-2">3. Ví dụ file JSON chuẩn (.json):</p>
+                <pre className="bg-gray-900 text-purple-100 p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed border border-gray-800">
+{`[
+  {
+    "urlOriginal": "https://res.cloudinary.com/demo/image/upload/photo1.jpg",
+    "caption": "Không gian tầng 1"
+  },
+  "https://res.cloudinary.com/demo/image/upload/photo2.jpg"
+]`}
+                </pre>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowPhotosImportHelp(false)}
+                className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm rounded-xl transition-colors cursor-pointer shadow-xs"
+              >
+                Đã hiểu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add / Edit Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs overflow-hidden">
+          <div className="bg-white rounded-2xl w-[98vw] max-w-[1780px] h-[94vh] max-h-[960px] shadow-2xl overflow-hidden border border-gray-200 flex flex-col my-auto">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center px-8 py-4 border-b border-gray-200 bg-gray-50/90 shrink-0">
+              <h3 className="font-extrabold text-gray-900 text-xl tracking-tight">
+                {modalType === 'create'
+                  ? 'Thêm địa điểm mới'
+                  : `Chỉnh sửa địa điểm: ${currentPlace.name || ''}`}
+              </h3>
+              <button onClick={() => setIsModalOpen(false)} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200/60 rounded-xl transition-colors cursor-pointer">
+                <X size={22} />
+              </button>
+            </div>
+
+            {/* 4-Tab Switcher Bar */}
+            <div className="flex border-b border-gray-200 bg-gray-50/80 px-6 pt-2 shrink-0 overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setActiveTab('basic')}
+                className={`flex items-center gap-2.5 px-6 py-3.5 text-sm font-bold rounded-t-xl transition-all cursor-pointer border-t border-x shrink-0 ${
+                  activeTab === 'basic'
+                    ? 'bg-white border-gray-250 text-blue-600 shadow-2xs -mb-px text-base'
+                    : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/80'
+                }`}
+              >
+                <Info size={18} />
+                1. Thông tin cơ bản &amp; Vị trí
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('extra')}
+                className={`flex items-center gap-2.5 px-6 py-3.5 text-sm font-bold rounded-t-xl transition-all cursor-pointer border-t border-x shrink-0 ${
+                  activeTab === 'extra'
+                    ? 'bg-white border-gray-250 text-blue-600 shadow-2xs -mb-px text-base'
+                    : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/80'
+                }`}
+              >
+                <Clock size={18} />
+                2. Danh mục phụ &amp; Giờ hoạt động
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('reviews')}
+                className={`flex items-center gap-2.5 px-6 py-3.5 text-sm font-bold rounded-t-xl transition-all cursor-pointer border-t border-x shrink-0 ${
+                  activeTab === 'reviews'
+                    ? 'bg-white border-gray-250 text-amber-600 shadow-2xs -mb-px text-base'
+                    : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/80'
+                }`}
+              >
+                <MessageSquare size={18} />
+                3. Quản lý Đánh giá {placeReviews.length > 0 && `(${placeReviews.length})`}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('photos')}
+                className={`flex items-center gap-2.5 px-6 py-3.5 text-sm font-bold rounded-t-xl transition-all cursor-pointer border-t border-x shrink-0 ${
+                  activeTab === 'photos'
+                    ? 'bg-white border-gray-250 text-purple-600 shadow-2xs -mb-px text-base'
+                    : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-100/80'
+                }`}
+              >
+                <ImageIcon size={18} />
+                4. Bộ sưu tập Hình ảnh {placePhotos.length > 0 && `(${placePhotos.length})`}
+              </button>
+            </div>
+
+            {/* TAB 1 & TAB 2 (Wrapped in Form) */}
+            {(activeTab === 'basic' || activeTab === 'extra') && (
+              <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 lg:p-8 flex flex-col justify-between space-y-6">
                 {modalError && (
-                  <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{modalError}</div>
+                  <div className="text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-xl p-4">{modalError}</div>
                 )}
 
-                {/* Sub-Tabs Switcher Bar */}
-                <div className="flex border-b border-gray-200 bg-gray-50/70 rounded-t-xl px-4 pt-2 -mx-5 -mt-5 mb-4">
-                  <button
-                    type="button"
-                    onClick={() => setFormSubTab('basic')}
-                    className={`flex items-center gap-2 px-5 py-3 text-xs font-bold rounded-t-xl transition-all cursor-pointer border-t border-x ${
-                      formSubTab === 'basic'
-                        ? 'bg-white border-gray-250 text-blue-600 shadow-2xs -mb-px'
-                        : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-100/60'
-                    }`}
-                  >
-                    <Info size={16} />
-                    1. Thông tin cơ bản & Vị trí
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormSubTab('extra')}
-                    className={`flex items-center gap-2 px-5 py-3 text-xs font-bold rounded-t-xl transition-all cursor-pointer border-t border-x ${
-                      formSubTab === 'extra'
-                        ? 'bg-white border-gray-250 text-blue-600 shadow-2xs -mb-px'
-                        : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-100/60'
-                    }`}
-                  >
-                    <ImageIcon size={16} />
-                    2. Hình ảnh, Danh mục phụ & Giờ hoạt động
-                  </button>
-                </div>
-
-                {/* Equal Height Sub-Tabs Container */}
-                <div className="min-h-[585px]">
+                <div className="flex-1">
                   {/* SUB-TAB 1: Basic Info & Map */}
-                  {formSubTab === 'basic' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                  {activeTab === 'basic' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                       {/* Left Column: Essential Fields */}
-                      <div className="space-y-4">
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-semibold text-gray-700 block">
+                      <div className="space-y-5">
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-gray-800 block">
                             Tên địa điểm <span className="text-red-500">*</span>
                           </label>
                           <input
@@ -1381,19 +2006,19 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                             value={currentPlace.name || ''}
                             onChange={(e) => setCurrentPlace({ ...currentPlace, name: e.target.value })}
                             disabled={modalLoading}
-                            className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-2 bg-white focus:outline-none focus:border-blue-500"
+                            className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
                           />
                         </div>
 
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-semibold text-gray-700 block">
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-gray-800 block">
                             Danh mục <span className="text-red-500">*</span>
                           </label>
                           <select
                             value={currentPlace.categoryId || (categories[0]?.id ? Number(categories[0].id) : '')}
                             onChange={(e) => setCurrentPlace({ ...currentPlace, categoryId: Number(e.target.value) })}
                             disabled={modalLoading}
-                            className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
+                            className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 cursor-pointer shadow-2xs font-medium"
                           >
                             {categories.map((c) => (
                               <option key={c.id} value={c.id}>
@@ -1403,20 +2028,20 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                           </select>
                         </div>
 
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-semibold text-gray-700 block">Mô tả ngắn</label>
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-gray-800 block">Mô tả ngắn</label>
                           <textarea
                             placeholder="Nhập mô tả địa điểm..."
                             value={currentPlace.description || ''}
                             onChange={(e) => setCurrentPlace({ ...currentPlace, description: e.target.value })}
                             disabled={modalLoading}
-                            rows={2}
-                            className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-2 bg-white focus:outline-none focus:border-blue-500"
+                            rows={3}
+                            className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
                           />
                         </div>
 
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-semibold text-gray-700 block">
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-gray-800 block">
                             Địa chỉ <span className="text-red-500">*</span>
                           </label>
                           <input
@@ -1425,85 +2050,155 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                             value={currentPlace.address || ''}
                             onChange={(e) => setCurrentPlace({ ...currentPlace, address: e.target.value })}
                             disabled={modalLoading}
-                            className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-2 bg-white focus:outline-none focus:border-blue-500"
+                            className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
                           />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-1.5">
-                            <label className="text-sm font-semibold text-gray-700 block">Mức giá</label>
+                        <div className="grid grid-cols-2 gap-5">
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-800 block">Mức giá</label>
                             <select
                               value={currentPlace.priceLevel || 'MODERATE'}
                               onChange={(e) => setCurrentPlace({ ...currentPlace, priceLevel: e.target.value })}
                               disabled={modalLoading}
-                              className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
+                              className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 cursor-pointer shadow-2xs font-medium"
                             >
-                              <option value="FREE">Miễn phí</option>
-                              <option value="CHEAP">Giá rẻ</option>
-                              <option value="MODERATE">Trung bình</option>
-                              <option value="EXPENSIVE">Cao cấp</option>
-                              <option value="VERY_EXP">Rất cao cấp</option>
+                              <option value="FREE">Miễn phí (FREE)</option>
+                              <option value="$">Giá rẻ ($)</option>
+                              <option value="$$">Vừa phải ($$)</option>
+                              <option value="MODERATE">Trung bình (MODERATE)</option>
+                              <option value="$$$">Cao cấp ($$$)</option>
+                              <option value="$$ - $$$$">Tầm trung - cao cấp ($$ - $$$$)</option>
+                              <option value="$$$$">Rất cao cấp ($$$$)</option>
                             </select>
                           </div>
-                          <div className="space-y-1.5">
-                            <label className="text-sm font-semibold text-gray-700 block">Số điện thoại</label>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-800 block">Số điện thoại</label>
                             <input
                               type="text"
                               placeholder="VD: 0292 3890..."
                               value={currentPlace.phone || ''}
                               onChange={(e) => setCurrentPlace({ ...currentPlace, phone: e.target.value })}
                               disabled={modalLoading}
-                              className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-2 bg-white focus:outline-none focus:border-blue-500"
+                              className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
                             />
                           </div>
                         </div>
 
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-semibold text-gray-700 block">Trang web</label>
-                          <input
-                            type="text"
-                            placeholder="VD: https://cloudmood.com..."
-                            value={currentPlace.website || ''}
-                            onChange={(e) => setCurrentPlace({ ...currentPlace, website: e.target.value })}
-                            disabled={modalLoading}
-                            className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-2 bg-white focus:outline-none focus:border-blue-500"
-                          />
+                        <div className="grid grid-cols-2 gap-5">
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-800 block">Đánh giá trung bình (Rating 0-5)</label>
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              max="5"
+                              placeholder="VD: 4.5 (nhập 42 -> 4.2)"
+                              value={currentPlace.rating !== undefined && currentPlace.rating !== null ? currentPlace.rating : ''}
+                              onChange={(e) => {
+                                const valStr = e.target.value;
+                                if (valStr === '') {
+                                  setCurrentPlace({ ...currentPlace, rating: null });
+                                  return;
+                                }
+                                let num = parseFloat(valStr);
+                                if (!isNaN(num)) {
+                                  if (num > 5 && num <= 50) {
+                                    num = Number((num / 10).toFixed(1));
+                                  } else if (num > 50) {
+                                    num = 5;
+                                  } else if (num < 0) {
+                                    num = 0;
+                                  }
+                                  setCurrentPlace({ ...currentPlace, rating: num });
+                                }
+                              }}
+                              onBlur={() => {
+                                if (currentPlace.rating !== null && currentPlace.rating !== undefined) {
+                                  let r = Number(currentPlace.rating);
+                                  if (r > 5 && r <= 50) r = Number((r / 10).toFixed(1));
+                                  else if (r > 5) r = 5;
+                                  else if (r < 0) r = 0;
+                                  setCurrentPlace({ ...currentPlace, rating: Number(r.toFixed(1)) });
+                                }
+                              }}
+                              disabled={modalLoading}
+                              className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-800 block">Tổng số lượt đánh giá</label>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="VD: 120"
+                              value={currentPlace.userRatingCount !== undefined && currentPlace.userRatingCount !== null ? currentPlace.userRatingCount : ''}
+                              onChange={(e) => setCurrentPlace({ ...currentPlace, userRatingCount: e.target.value === '' ? null : parseInt(e.target.value) })}
+                              disabled={modalLoading}
+                              className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-5">
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-800 block">Trang web (Website)</label>
+                            <input
+                              type="text"
+                              placeholder="VD: https://cloudmood.com..."
+                              value={currentPlace.website || ''}
+                              onChange={(e) => setCurrentPlace({ ...currentPlace, website: e.target.value })}
+                              disabled={modalLoading}
+                              className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-800 block">Link TripAdvisor (tripadvisorUrl)</label>
+                            <input
+                              type="text"
+                              placeholder="VD: https://www.tripadvisor.com/..."
+                              value={currentPlace.tripadvisorUrl || ''}
+                              onChange={(e) => setCurrentPlace({ ...currentPlace, tripadvisorUrl: e.target.value })}
+                              disabled={modalLoading}
+                              className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                            />
+                          </div>
                         </div>
                       </div>
 
                       {/* Right Column: Coordinates & MapPicker */}
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-1.5">
-                            <label className="text-sm font-semibold text-gray-700 block">Vĩ độ (Latitude)</label>
+                      <div className="space-y-5">
+                        <div className="grid grid-cols-2 gap-5">
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-800 block">Vĩ độ (Latitude)</label>
                             <input
                               type="number"
                               step="any"
                               value={currentPlace.latitude || ''}
                               onChange={(e) => setCurrentPlace({ ...currentPlace, latitude: parseFloat(e.target.value) || 0 })}
                               disabled={modalLoading}
-                              className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-2 bg-white focus:outline-none focus:border-blue-500"
+                              className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
                             />
                           </div>
-                          <div className="space-y-1.5">
-                            <label className="text-sm font-semibold text-gray-700 block">Kinh độ (Longitude)</label>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-800 block">Kinh độ (Longitude)</label>
                             <input
                               type="number"
                               step="any"
                               value={currentPlace.longitude || ''}
                               onChange={(e) => setCurrentPlace({ ...currentPlace, longitude: parseFloat(e.target.value) || 0 })}
                               disabled={modalLoading}
-                              className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-2 bg-white focus:outline-none focus:border-blue-500"
+                              className="w-full text-base text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
                             />
                           </div>
                         </div>
 
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-semibold text-gray-700 flex items-center justify-between">
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-gray-800 flex items-center justify-between">
                             <span>Chọn vị trí trên bản đồ</span>
-                            <span className="text-xs font-normal text-gray-400">Click trên bản đồ để chọn tọa độ</span>
+                            <span className="text-xs font-medium text-gray-500">Click trên bản đồ để tự động lấy tọa độ</span>
                           </label>
-                          <div className="w-full h-[465px] border border-gray-250 rounded-xl overflow-hidden shadow-2xs relative bg-gray-50">
+                          <div className="w-full h-[520px] border border-gray-300 rounded-2xl overflow-hidden shadow-xs relative bg-gray-50">
                             <MapPicker
                               lat={Number(currentPlace.latitude) || 10.03022}
                               lng={Number(currentPlace.longitude) || 105.78753}
@@ -1515,324 +2210,428 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                     </div>
                   )}
 
-                  {/* SUB-TAB 2: Image, Subcategories & Hours */}
-                  {formSubTab === 'extra' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                      {/* Left Column: Image Preview & Subcategories */}
-                      <div className="space-y-4">
-                        {/* Image Link & Large Preview */}
-                        <div className="space-y-3 bg-gray-50/60 p-4 rounded-xl border border-gray-200">
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between">
-                              <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
-                                <ImageIcon size={16} className="text-blue-600" />
-                                Ảnh minh họa đại diện
-                              </label>
-                              <button
-                                type="button"
-                                onClick={() => thumbnailInputRef.current?.click()}
-                                className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-md border border-blue-200 transition-colors cursor-pointer"
-                              >
-                                <Upload size={13} /> Chọn ảnh từ máy...
-                              </button>
-                              <input
-                                type="file"
-                                ref={thumbnailInputRef}
-                                accept="image/*"
-                                className="hidden"
-                                onChange={handleThumbnailFileChange}
-                              />
-                            </div>
-                            <input
-                              type="text"
-                              placeholder="Dán đường dẫn link URL (https://...) hoặc bấm 'Chọn ảnh từ máy'"
-                              value={currentPlace.image || ''}
-                              onChange={(e) => setCurrentPlace({ ...currentPlace, image: e.target.value })}
-                              disabled={modalLoading}
-                              className="w-full text-sm text-gray-900 border border-gray-300 rounded-lg px-3.5 py-2 bg-white focus:outline-none focus:border-blue-500"
-                            />
+                  {/* SUB-TAB 2: Subcategories, Opening Hours & Representative Image */}
+                  {activeTab === 'extra' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                      {/* Left Column: Subcategories (Spacious & Prominent) */}
+                      <div className="space-y-5 bg-gray-50/70 p-6 rounded-2xl border border-gray-200 flex flex-col justify-between min-h-[620px]">
+                        <div className="space-y-5">
+                          <div className="flex items-center justify-between border-b border-gray-200 pb-3.5">
+                            <label className="text-lg font-extrabold text-gray-900 flex items-center gap-2.5">
+                              <Layers size={22} className="text-blue-600" />
+                              Danh mục phụ (Subcategories)
+                            </label>
+                            <span className="text-xs text-gray-600 font-semibold bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-200">
+                              Đã chọn: {(currentPlace.subCategories || []).length} danh mục
+                            </span>
                           </div>
 
-                          {/* Large Image Preview Box */}
-                          <div className="space-y-1.5">
-                            <span className="text-xs font-semibold text-gray-500 block">Xem trước ảnh minh họa:</span>
-                            <div className="relative w-full h-52 rounded-xl overflow-hidden border border-gray-200 bg-white flex items-center justify-center shadow-inner group">
-                              {currentPlace.image ? (
-                                <img 
-                                  src={currentPlace.image} 
-                                  alt="Xem trước địa điểm" 
-                                  className="max-h-full max-w-full object-contain p-2 transition-transform duration-300 group-hover:scale-105"
-                                  onError={(e) => {
-                                    (e.target as HTMLElement).style.display = 'none';
-                                  }}
-                                />
-                              ) : (
-                                <div className="flex flex-col items-center justify-center text-gray-400 p-4 text-center">
-                                  <ImageIcon size={36} className="mb-2 text-gray-300" />
-                                  <span className="text-xs font-medium">Chưa có ảnh minh họa</span>
-                                  <span className="text-[11px] text-gray-400 mt-0.5">Dán link URL hoặc bấm 'Chọn ảnh từ máy' ở trên</span>
+                          {/* Selected Subcategories Tags */}
+                          <div className="space-y-2">
+                            <span className="text-xs font-extrabold text-gray-700 block uppercase tracking-wider">Danh mục phụ đã gán:</span>
+                            <div className="flex flex-wrap gap-2.5 min-h-[56px] p-4 bg-white rounded-xl border border-gray-200 shadow-inner">
+                              {(currentPlace.subCategories || []).length === 0 ? (
+                                <div className="flex items-center gap-2 text-sm text-gray-400 italic py-1">
+                                  <span>Chưa chọn danh mục phụ nào. Vui lòng chọn từ gợi ý bên dưới hoặc tự nhập thêm.</span>
                                 </div>
+                              ) : (
+                                (currentPlace.subCategories || []).map((sub: string) => (
+                                  <span key={sub} className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-sm font-bold px-3.5 py-2 rounded-xl border border-blue-200 shadow-2xs animate-in fade-in duration-150">
+                                    {sub}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const updated = (currentPlace.subCategories || []).filter((s: string) => s !== sub);
+                                        setCurrentPlace({ ...currentPlace, subCategories: updated });
+                                      }}
+                                      className="text-blue-400 hover:text-blue-900 hover:bg-blue-100 p-0.5 rounded transition-colors cursor-pointer text-sm font-black shrink-0"
+                                      title="Xóa danh mục này"
+                                    >
+                                      &times;
+                                    </button>
+                                  </span>
+                                ))
                               )}
                             </div>
                           </div>
-                        </div>
 
-                        {/* Subcategories (Danh mục phụ) */}
-                        <div className="space-y-3 bg-gray-50/60 p-4 rounded-xl border border-gray-200">
-                          <label className="text-sm font-bold text-gray-800 block">Danh mục phụ</label>
-                          <div className="flex flex-wrap gap-1.5 min-h-[32px]">
-                            {(currentPlace.subCategories || []).length === 0 ? (
-                              <span className="text-xs text-gray-400 italic">Chưa chọn danh mục phụ nào</span>
-                            ) : (
-                              (currentPlace.subCategories || []).map((sub: string) => (
-                                <span key={sub} className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-medium px-2.5 py-1 rounded-full border border-blue-200">
-                                  {sub}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const updated = (currentPlace.subCategories || []).filter((s: string) => s !== sub);
-                                      setCurrentPlace({ ...currentPlace, subCategories: updated });
-                                    }}
-                                    className="text-blue-500 hover:text-blue-800 font-bold shrink-0 cursor-pointer text-xs"
-                                  >
-                                    &times;
-                                  </button>
-                                </span>
-                              ))
-                            )}
-                          </div>
+                          {/* System Suggestions Grid with Live Search Filter */}
+                          <div className="space-y-2.5 pt-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-extrabold text-gray-700 flex items-center gap-2">
+                                <span>Gợi ý danh mục phụ từ hệ thống:</span>
+                                {currentPlace.subCategoriesInput?.trim() && (
+                                  <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200 animate-in fade-in duration-150">
+                                    Kết quả tìm kiếm cho: "{currentPlace.subCategoriesInput.trim()}"
+                                  </span>
+                                )}
+                              </span>
+                              <span className="text-xs font-normal text-gray-500">(Click để thêm nhanh)</span>
+                            </div>
 
-                          {allSubCategories.filter(s => !(currentPlace.subCategories || []).includes(s)).length > 0 && (
-                            <div className="space-y-1 pt-1 border-t border-gray-200/60">
-                              <span className="text-[11px] font-semibold text-gray-400 block">Gợi ý từ hệ thống:</span>
-                              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
-                                {allSubCategories
-                                  .filter(s => !(currentPlace.subCategories || []).includes(s))
-                                  .map((sub: string) => (
+                            {(() => {
+                              const query = (currentPlace.subCategoriesInput || '').trim().toLowerCase();
+                              const availableSuggestions = allSubCategories.filter(s => !(currentPlace.subCategories || []).includes(s));
+                              const filteredSuggestions = query
+                                ? availableSuggestions.filter(s => s.toLowerCase().includes(query))
+                                : availableSuggestions;
+
+                              if (filteredSuggestions.length === 0) {
+                                return (
+                                  <div className="p-4 bg-white rounded-xl border border-dashed border-gray-300 text-center text-xs text-gray-500">
+                                    {query ? (
+                                      <span>Không tìm thấy gợi ý nào khớp với "<strong>{currentPlace.subCategoriesInput}</strong>". Bấm nút <strong className="text-blue-600">+ Thêm</strong> hoặc nhấn <strong className="text-blue-600">Enter</strong> để tạo mới danh mục phụ này!</span>
+                                    ) : (
+                                      <span>Đã chọn tất cả danh mục phụ gợi ý từ hệ thống.</span>
+                                    )}
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <div className="flex flex-wrap gap-2.5 max-h-[260px] overflow-y-auto p-4 bg-white rounded-xl border border-gray-200 shadow-2xs pr-2">
+                                  {filteredSuggestions.map((sub: string) => (
                                     <button
                                       key={sub}
                                       type="button"
                                       onClick={() => {
                                         const updated = [...(currentPlace.subCategories || []), sub];
-                                        setCurrentPlace({ ...currentPlace, subCategories: updated });
+                                        setCurrentPlace({ ...currentPlace, subCategories: updated, subCategoriesInput: '' });
                                       }}
-                                      className="text-[11px] bg-white hover:bg-gray-100 text-gray-600 px-2 py-0.5 rounded-md border border-gray-200 transition-colors cursor-pointer"
+                                      className="text-sm font-bold bg-gray-50 hover:bg-blue-50 text-gray-800 hover:text-blue-700 px-3.5 py-2 rounded-xl border border-gray-200 hover:border-blue-300 transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
                                     >
-                                      + {sub}
+                                      <Plus size={14} className="text-blue-600" />
+                                      {sub}
                                     </button>
                                   ))}
-                              </div>
-                            </div>
-                          )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
 
-                          <div className="flex gap-2 pt-1">
-                            <input
-                              type="text"
-                              placeholder="Nhập danh mục phụ mới..."
-                              value={currentPlace.subCategoriesInput || ''}
-                              onChange={(e) => setCurrentPlace({ ...currentPlace, subCategoriesInput: e.target.value })}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  const val = currentPlace.subCategoriesInput?.trim();
-                                  if (val && !(currentPlace.subCategories || []).includes(val)) {
+                        {/* Combined Search & Custom Subcategory Input Bar */}
+                        <div className="space-y-2.5 pt-4 border-t border-gray-200">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-extrabold text-gray-700 block">Tìm kiếm hoặc tự thêm danh mục phụ mới:</span>
+                            <span className="text-[11px] text-gray-500">Gõ từ khóa để lọc hoặc nhấn Enter để thêm mới</span>
+                          </div>
+                          <div className="flex gap-3">
+                            <div className="relative flex-1">
+                              <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                              <input
+                                type="text"
+                                placeholder="Nhập tìm kiếm hoặc gõ tên danh mục phụ mới..."
+                                value={currentPlace.subCategoriesInput || ''}
+                                onChange={(e) => setCurrentPlace({ ...currentPlace, subCategoriesInput: e.target.value })}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    const val = currentPlace.subCategoriesInput?.trim();
+                                    if (!val) return;
+                                    const newCats = val.split(/[,;]/).map((s: string) => s.trim()).filter(Boolean);
+                                    const existing = currentPlace.subCategories || [];
+                                    const merged = Array.from(new Set([...existing, ...newCats]));
                                     setCurrentPlace({
                                       ...currentPlace,
-                                      subCategories: [...(currentPlace.subCategories || []), val],
+                                      subCategories: merged,
                                       subCategoriesInput: ''
                                     });
                                   }
-                                }
-                              }}
-                              disabled={modalLoading}
-                              className="flex-1 text-xs text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:border-blue-500"
-                            />
+                                }}
+                                disabled={modalLoading}
+                                className="w-full text-sm text-gray-900 border border-gray-300 rounded-xl pl-10 pr-9 py-2.5 bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-2xs font-medium"
+                              />
+                              {currentPlace.subCategoriesInput && (
+                                <button
+                                  type="button"
+                                  onClick={() => setCurrentPlace({ ...currentPlace, subCategoriesInput: '' })}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                                  title="Xóa tìm kiếm"
+                                >
+                                  <X size={14} />
+                                </button>
+                              )}
+                            </div>
                             <button
                               type="button"
                               onClick={() => {
                                 const val = currentPlace.subCategoriesInput?.trim();
-                                if (val && !(currentPlace.subCategories || []).includes(val)) {
-                                  setCurrentPlace({
-                                    ...currentPlace,
-                                    subCategories: [...(currentPlace.subCategories || []), val],
-                                    subCategoriesInput: ''
-                                  });
-                                }
+                                if (!val) return;
+                                const newCats = val.split(/[,;]/).map((s: string) => s.trim()).filter(Boolean);
+                                const existing = currentPlace.subCategories || [];
+                                const merged = Array.from(new Set([...existing, ...newCats]));
+                                setCurrentPlace({
+                                  ...currentPlace,
+                                  subCategories: merged,
+                                  subCategoriesInput: ''
+                                });
                               }}
-                              className="px-3.5 py-1.5 bg-gray-150 hover:bg-gray-250 text-gray-700 text-xs font-semibold rounded-lg transition-colors border border-gray-300 cursor-pointer"
+                              disabled={modalLoading || !currentPlace.subCategoriesInput?.trim()}
+                              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 shrink-0"
                             >
+                              <Plus size={16} />
                               Thêm
                             </button>
                           </div>
                         </div>
                       </div>
 
-                      {/* Right Column: Opening Hours */}
-                      <div className="space-y-4">
-
+                      {/* Right Column: Opening Hours & Representative Image */}
+                      <div className="space-y-5">
                         {/* Opening Hours (Giờ hoạt động chi tiết từng ngày) */}
-                        <div className="space-y-3 bg-gray-50/60 p-4 rounded-xl border border-gray-200">
-                        <label className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
-                          <Clock size={16} className="text-blue-600" />
-                          Giờ hoạt động chi tiết từng ngày
-                        </label>
-                        <div className="space-y-2.5">
-                          {[
-                            { key: 'monday', label: 'Thứ 2' },
-                            { key: 'tuesday', label: 'Thứ 3' },
-                            { key: 'wednesday', label: 'Thứ 4' },
-                            { key: 'thursday', label: 'Thứ 5' },
-                            { key: 'friday', label: 'Thứ 6' },
-                            { key: 'saturday', label: 'Thứ 7' },
-                            { key: 'sunday', label: 'Chủ nhật' },
-                          ].map((day) => {
-                            const dayHours = currentPlace.openingHours?.[day.key];
-                            const isOpen = Array.isArray(dayHours) && dayHours.length >= 2;
-                            const openTime = isOpen ? dayHours[0] : '08:00';
-                            const closeTime = isOpen ? dayHours[1] : '21:00';
+                        <div className="space-y-4 bg-gray-50/70 p-5 rounded-2xl border border-gray-200">
+                          <label className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+                            <Clock size={20} className="text-blue-600" />
+                            Giờ hoạt động chi tiết từng ngày
+                          </label>
+                          <div className="space-y-3">
+                            {[
+                              { key: 'monday', label: 'Thứ 2' },
+                              { key: 'tuesday', label: 'Thứ 3' },
+                              { key: 'wednesday', label: 'Thứ 4' },
+                              { key: 'thursday', label: 'Thứ 5' },
+                              { key: 'friday', label: 'Thứ 6' },
+                              { key: 'saturday', label: 'Thứ 7' },
+                              { key: 'sunday', label: 'Chủ nhật' },
+                            ].map((day) => {
+                              const dayHours = currentPlace.openingHours?.[day.key];
+                              const isOpen = Array.isArray(dayHours) && dayHours.length >= 2;
+                              const openTime = isOpen ? dayHours[0] : '07:00';
+                              const closeTime = isOpen ? dayHours[1] : '23:00';
 
-                            return (
-                              <div key={day.key} className="flex items-center justify-between text-xs border-b border-gray-150/60 pb-2.5 last:border-0 last:pb-0">
-                                <div className="flex items-center gap-3">
-                                  <label className="flex items-center cursor-pointer select-none">
+                              return (
+                                <div key={day.key} className="flex items-center justify-between text-sm border-b border-gray-200/80 pb-3 last:border-0 last:pb-0">
+                                  <div className="flex items-center gap-3">
+                                    <label className="flex items-center cursor-pointer select-none">
+                                      <input
+                                        type="checkbox"
+                                        checked={isOpen}
+                                        onChange={(e) => {
+                                          const checked = e.target.checked;
+                                          const updatedHours = { ...(currentPlace.openingHours || {}) };
+                                          if (checked) {
+                                            updatedHours[day.key] = ['07:00', '23:00'];
+                                          } else {
+                                            updatedHours[day.key] = null;
+                                          }
+                                          setCurrentPlace({ ...currentPlace, openingHours: updatedHours });
+                                        }}
+                                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                                      />
+                                    </label>
+                                    <span className="font-bold text-gray-800 min-w-[85px]">{day.label}</span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2.5">
                                     <input
-                                      type="checkbox"
-                                      checked={isOpen}
+                                      type="time"
+                                      value={openTime}
+                                      disabled={!isOpen || modalLoading}
                                       onChange={(e) => {
-                                        const checked = e.target.checked;
                                         const updatedHours = { ...(currentPlace.openingHours || {}) };
-                                        if (checked) {
-                                          updatedHours[day.key] = ['08:00', '21:00'];
-                                        } else {
-                                          updatedHours[day.key] = null;
-                                        }
+                                        updatedHours[day.key] = [e.target.value, closeTime];
                                         setCurrentPlace({ ...currentPlace, openingHours: updatedHours });
                                       }}
-                                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                                      className="text-sm font-semibold text-gray-900 border border-gray-300 rounded-xl px-3 py-2 bg-white disabled:bg-gray-100 disabled:text-gray-400 focus:outline-none focus:border-blue-600 w-[130px] text-center"
                                     />
-                                  </label>
-                                  <span className="font-semibold text-gray-700 min-w-[65px]">{day.label}</span>
+                                    <span className="text-gray-400 text-sm font-bold">&ndash;</span>
+                                    <input
+                                      type="time"
+                                      value={closeTime}
+                                      disabled={!isOpen || modalLoading}
+                                      onChange={(e) => {
+                                        const updatedHours = { ...(currentPlace.openingHours || {}) };
+                                        updatedHours[day.key] = [openTime, e.target.value];
+                                        setCurrentPlace({ ...currentPlace, openingHours: updatedHours });
+                                      }}
+                                      className="text-sm font-semibold text-gray-900 border border-gray-300 rounded-xl px-3 py-2 bg-white disabled:bg-gray-100 disabled:text-gray-400 focus:outline-none focus:border-blue-600 w-[130px] text-center"
+                                    />
+                                  </div>
                                 </div>
+                              );
+                            })}
+                          </div>
+                        </div>
 
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="time"
-                                    value={openTime}
-                                    disabled={!isOpen || modalLoading}
-                                    onChange={(e) => {
-                                      const updatedHours = { ...(currentPlace.openingHours || {}) };
-                                      updatedHours[day.key] = [e.target.value, closeTime];
-                                      setCurrentPlace({ ...currentPlace, openingHours: updatedHours });
-                                    }}
-                                    className="text-xs text-gray-900 border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white disabled:bg-gray-100 disabled:text-gray-400 focus:outline-none focus:border-blue-500 w-[115px] text-center"
-                                  />
-                                  <span className="text-gray-400 text-xs font-bold">&ndash;</span>
-                                  <input
-                                    type="time"
-                                    value={closeTime}
-                                    disabled={!isOpen || modalLoading}
-                                    onChange={(e) => {
-                                      const updatedHours = { ...(currentPlace.openingHours || {}) };
-                                      updatedHours[day.key] = [openTime, e.target.value];
-                                      setCurrentPlace({ ...currentPlace, openingHours: updatedHours });
-                                    }}
-                                    className="text-xs text-gray-900 border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white disabled:bg-gray-100 disabled:text-gray-400 focus:outline-none focus:border-blue-500 w-[115px] text-center"
-                                  />
-                                </div>
+                        {/* Representative Image Link & Preview */}
+                        <div className="space-y-4 bg-gray-50/70 p-5 rounded-2xl border border-gray-200">
+                          <div className="flex items-center justify-between">
+                            <label className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+                              <ImageIcon size={20} className="text-blue-600" />
+                              Ảnh minh họa đại diện
+                            </label>
+                            <button
+                              type="button"
+                              disabled={uploadingThumbnail || modalLoading}
+                              onClick={() => thumbnailInputRef.current?.click()}
+                              className="flex items-center gap-1.5 text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-3.5 py-1.5 rounded-xl border border-blue-200 transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                              {uploadingThumbnail ? (
+                                <>
+                                  <Loader2 size={14} className="animate-spin text-blue-600" /> Đang tải Cloudinary...
+                                </>
+                              ) : (
+                                <>
+                                  <Upload size={14} /> Chọn ảnh từ máy...
+                                </>
+                              )}
+                            </button>
+                            <input
+                              type="file"
+                              ref={thumbnailInputRef}
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleThumbnailFileChange}
+                            />
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <input
+                              type="text"
+                              placeholder="Dán đường dẫn link URL (https://...) hoặc chọn ảnh ở trên"
+                              value={currentPlace.image || ''}
+                              onChange={(e) => setCurrentPlace({ ...currentPlace, image: e.target.value })}
+                              disabled={modalLoading}
+                              className="flex-1 text-sm text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 shadow-2xs font-medium"
+                            />
+                            {currentPlace.image && (
+                              <div className="w-14 h-14 rounded-xl overflow-hidden border border-gray-200 bg-white shrink-0 shadow-xs">
+                                <img src={currentPlace.image} alt="" className="w-full h-full object-cover" />
                               </div>
-                            );
-                          })}
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
                   )}
                 </div>
 
-                {/* Footer Buttons */}
-                <div className="flex items-center justify-between pt-4 border-t border-gray-200 mt-4">
+                {/* Footer Buttons for Tab 1 & Tab 2 */}
+                <div className="flex items-center justify-between pt-5 border-t border-gray-200 shrink-0">
                   <div>
-                    {formSubTab === 'basic' ? (
+                    {activeTab === 'basic' ? (
                       <button
                         type="button"
-                        onClick={() => setFormSubTab('extra')}
-                        className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-3 py-2 rounded-lg transition-colors cursor-pointer"
+                        onClick={() => setActiveTab('extra')}
+                        className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-4 py-2.5 rounded-xl transition-colors cursor-pointer"
                       >
-                        Sang Tab 2: Hình ảnh & Giờ mở cửa <ArrowRight size={14} />
+                        Sang Tab 2: Danh mục phụ &amp; Giờ mở cửa <ArrowRight size={16} />
                       </button>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => setFormSubTab('basic')}
-                        className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-3 py-2 rounded-lg transition-colors cursor-pointer"
-                      >
-                        <ArrowLeft size={14} /> Trở lại Tab 1: Thông tin cơ bản
-                      </button>
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('basic')}
+                          className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-4 py-2.5 rounded-xl transition-colors cursor-pointer"
+                        >
+                          <ArrowLeft size={16} /> Trở lại Tab 1: Thông tin cơ bản
+                        </button>
+                        {modalType === 'edit' && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('reviews')}
+                            className="flex items-center gap-2 text-sm font-bold text-amber-600 hover:text-amber-800 hover:bg-amber-50 px-4 py-2.5 rounded-xl transition-colors cursor-pointer"
+                          >
+                            Sang Tab 3: Quản lý Đánh giá <ArrowRight size={16} />
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
 
-                  <div className="flex gap-3">
+                  <div className="flex gap-4">
                     <button
                       type="button"
                       onClick={() => setIsModalOpen(false)}
                       disabled={modalLoading}
-                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium cursor-pointer"
+                      className="px-6 py-2.5 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-100 transition-colors text-sm font-bold cursor-pointer"
                     >
                       Hủy
                     </button>
                     <button
                       type="submit"
-                      disabled={modalLoading}
-                      className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors text-sm font-bold cursor-pointer shadow-xs"
+                      disabled={modalLoading || uploadingThumbnail || uploadingDetailPhoto || uploadingAvatar}
+                      className="flex items-center gap-2 px-7 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-colors text-sm font-extrabold cursor-pointer shadow-md"
                     >
-                      {modalLoading && <Loader2 size={16} className="animate-spin" />}
-                      Lưu thay đổi
+                      {(modalLoading || uploadingThumbnail || uploadingDetailPhoto || uploadingAvatar) && <Loader2 size={18} className="animate-spin" />}
+                      {uploadingThumbnail || uploadingDetailPhoto || uploadingAvatar
+                        ? 'Đang tải ảnh...'
+                        : modalLoading
+                        ? 'Đang lưu...'
+                        : modalType === 'create'
+                        ? 'Tạo địa điểm mới'
+                        : 'Lưu thay đổi'}
                     </button>
                   </div>
                 </div>
               </form>
             )}
 
-            {/* Tab 2: Reviews */}
-            {modalType === 'edit' && activeTab === 'reviews' && (
-              <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
-                <div className="space-y-4">
+            {/* TAB 3: REVIEWS */}
+            {activeTab === 'reviews' && (
+              <div className="flex-1 overflow-y-auto p-6 lg:p-8 flex flex-col justify-between space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start flex-1">
                   {/* Reviews List */}
-                  <div className="space-y-4">
-                    <h4 className="font-bold text-gray-900 text-base">Danh sách đánh giá</h4>
+                  <div className="lg:col-span-2 space-y-5">
+                    <h4 className="font-extrabold text-gray-900 text-lg flex items-center justify-between border-b border-gray-200 pb-3 flex-wrap gap-2">
+                      <span>Danh sách đánh giá</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowReviewsImportHelp(true)}
+                          className="flex items-center gap-1.5 bg-white hover:bg-amber-50 text-gray-700 hover:text-amber-800 border border-gray-300 hover:border-amber-300 font-bold px-3 py-1.5 rounded-xl transition-colors cursor-pointer text-xs shadow-2xs"
+                          title="Xem hướng dẫn định dạng file import đánh giá"
+                        >
+                          <Info size={14} className="text-amber-600" />
+                          <span>Hướng dẫn mẫu</span>
+                        </button>
+                        <label className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold px-3 py-1.5 rounded-xl transition-colors cursor-pointer text-xs shadow-2xs">
+                          <Upload size={14} />
+                          <span>Import File Đánh giá</span>
+                          <input
+                            type="file"
+                            ref={importReviewsInputRef}
+                            accept=".json,.csv"
+                            onChange={handleImportReviewsFile}
+                            className="hidden"
+                          />
+                        </label>
+                        <span className="text-xs font-bold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-xl">
+                          {placeReviews.length} nhận xét
+                        </span>
+                      </div>
+                    </h4>
                     
                     {reviewsLoading ? (
-                      <div className="py-10 flex items-center justify-center text-gray-500">
-                        <Loader2 className="animate-spin text-blue-500 mr-2" size={24} />
-                        <span>Đang tải đánh giá...</span>
+                      <div className="py-12 flex items-center justify-center text-gray-500">
+                        <Loader2 className="animate-spin text-blue-500 mr-2" size={26} />
+                        <span className="text-base font-semibold">Đang tải đánh giá...</span>
                       </div>
                     ) : placeReviews.length === 0 ? (
-                      <div className="py-10 text-center text-gray-400 border border-dashed border-gray-200 rounded-xl">
+                      <div className="py-12 text-center text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl text-base">
                         Chưa có đánh giá nào cho địa điểm này.
                       </div>
                     ) : (
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         {placeReviews.map((review) => (
-                          <div key={review.id} className="p-4 bg-gray-50/50 hover:bg-gray-50 rounded-xl border border-gray-200 transition-all flex gap-4 items-start relative group">
-                            <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 border border-gray-200 shrink-0">
+                          <div key={review.id} className="p-5 bg-gray-50/70 hover:bg-gray-50 rounded-2xl border border-gray-200 transition-all flex gap-4 items-start relative group shadow-2xs">
+                            <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 border border-gray-200 shrink-0 flex items-center justify-center text-gray-400">
                               {review.authorAvatar ? (
                                 <img src={review.authorAvatar} alt="" className="object-cover w-full h-full" />
                               ) : (
-                                <div className="w-full h-full bg-blue-50 text-blue-600 font-bold flex items-center justify-center text-sm">
-                                  {(review.authorName || "A").charAt(0).toUpperCase()}
-                                </div>
+                                <User size={22} />
                               )}
                             </div>
                             
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-gray-900 text-sm">{review.authorName || 'Ẩn danh'}</span>
+                            <div className="flex-1 min-w-0 space-y-1.5">
+                              <div className="flex items-center gap-2.5 flex-wrap">
+                                <span className="font-extrabold text-gray-900 text-base">{review.authorName || 'Ẩn danh'}</span>
                                 {review.authorLocation && (
-                                  <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                                  <span className="text-xs text-gray-600 bg-gray-200/70 px-2 py-0.5 rounded-md font-medium">
                                     📍 {review.authorLocation}
                                   </span>
                                 )}
-                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase shrink-0 ${
+                                <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-md border uppercase shrink-0 ${
                                   review.source === 'TRIPADVISOR' 
                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                                     : 'bg-blue-50 text-blue-700 border-blue-200'
@@ -1841,23 +2640,23 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                                 </span>
                               </div>
 
-                              <div className="flex items-center gap-1.5 my-1">
-                                <div className="flex items-center gap-0.5 text-amber-400">
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1 text-amber-400">
                                   {[1, 2, 3, 4, 5].map((star) => (
                                     <Star
                                       key={star}
-                                      size={12}
+                                      size={14}
                                       fill={star <= (review.rating || 0) ? "currentColor" : "none"}
                                       className={star <= (review.rating || 0) ? "text-amber-400" : "text-gray-300"}
                                     />
                                   ))}
                                 </div>
-                                <span className="text-xs font-semibold text-gray-500">
+                                <span className="text-xs font-bold text-gray-500">
                                   {review.publishedDate ? new Date(review.publishedDate).toLocaleDateString('vi-VN') : ''}
                                 </span>
                               </div>
 
-                              <p className="text-gray-750 text-xs mt-1.5 leading-relaxed bg-white p-2.5 rounded-lg border border-gray-100 italic shadow-inner">
+                              <p className="text-gray-800 text-sm mt-2 leading-relaxed bg-white p-3.5 rounded-xl border border-gray-200 shadow-2xs font-medium">
                                 {review.comment || '(Không có nhận xét)'}
                               </p>
                             </div>
@@ -1865,41 +2664,202 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                             <button
                               type="button"
                               onClick={() => handleDeleteReview(Number(review.id))}
-                              className="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-red-650 hover:bg-red-50 rounded-lg transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+                              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-red-650 hover:bg-red-50 rounded-xl transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
                               title="Xóa đánh giá"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={16} />
                             </button>
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
+
+                  {/* Add Review Form */}
+                  <form onSubmit={handleAddReview} className="p-6 bg-gray-50/70 rounded-2xl border border-gray-200 space-y-5 h-fit shadow-xs">
+                    <h4 className="font-extrabold text-gray-900 text-base flex items-center gap-2 border-b border-gray-200 pb-3">
+                      <Plus size={18} className="text-blue-600" />
+                      Thêm đánh giá mới
+                    </h4>
+
+                    {reviewError && (
+                      <div className="text-sm font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded-xl p-3 flex items-center gap-2 animate-in fade-in duration-150">
+                        <AlertCircle size={16} className="shrink-0" />
+                        <span>{reviewError}</span>
+                      </div>
+                    )}
+
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="font-bold text-gray-800 text-sm block">Tên người đánh giá *</label>
+                        <input
+                          type="text"
+                          required
+                          value={newReview.authorName}
+                          onChange={(e) => setNewReview({ ...newReview, authorName: e.target.value })}
+                          placeholder="VD: Nguyen Van A"
+                          className="w-full text-sm text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 font-medium"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="font-bold text-gray-800 text-sm block">Số sao đánh giá *</label>
+                        <div className="flex items-center gap-1.5">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setNewReview({ ...newReview, rating: star })}
+                              className="p-1 text-amber-400 hover:scale-110 transition-transform cursor-pointer"
+                            >
+                              <Star
+                                size={24}
+                                fill={star <= newReview.rating ? "currentColor" : "none"}
+                                className={star <= newReview.rating ? "text-amber-400" : "text-gray-300"}
+                              />
+                            </button>
+                          ))}
+                          <span className="ml-2 font-bold text-gray-800 text-sm">{newReview.rating} sao</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="font-bold text-gray-800 text-sm block">Quê quán / Vị trí (Tùy chọn)</label>
+                        <input
+                          type="text"
+                          value={newReview.authorLocation}
+                          onChange={(e) => setNewReview({ ...newReview, authorLocation: e.target.value })}
+                          placeholder="VD: Cần Thơ, TP.HCM..."
+                          className="w-full text-sm text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 font-medium"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="font-bold text-gray-800 text-sm block">Ảnh đại diện (Link Avatar URL)</label>
+                          <button
+                            type="button"
+                            disabled={uploadingAvatar || modalLoading}
+                            onClick={() => avatarInputRef.current?.click()}
+                            className="text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg border border-blue-200 transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                          >
+                            {uploadingAvatar ? (
+                              <>
+                                <Loader2 size={12} className="animate-spin text-blue-600" /> Đang tải...
+                              </>
+                            ) : (
+                              <>
+                                <Upload size={12} /> Chọn từ máy...
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <input
+                          type="file"
+                          ref={avatarInputRef}
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleAvatarFileChange}
+                        />
+                        <input
+                          type="text"
+                          value={newReview.authorAvatar}
+                          onChange={(e) => setNewReview({ ...newReview, authorAvatar: e.target.value })}
+                          placeholder="https://... hoặc chọn ảnh từ máy ở trên"
+                          className="w-full text-sm text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 font-medium"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="font-bold text-gray-800 text-sm block">Nội dung nhận xét *</label>
+                        <textarea
+                          required
+                          rows={4}
+                          value={newReview.comment}
+                          onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
+                          placeholder="Nhập nhận xét chi tiết..."
+                          className="w-full text-sm text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold rounded-xl text-sm transition-colors shadow-xs cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Plus size={18} /> Thêm đánh giá vào danh sách
+                    </button>
+                  </form>
+                </div>
+
+                {/* Footer Buttons for Tab 3: Reviews */}
+                <div className="flex items-center justify-between pt-5 border-t border-gray-200 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('extra')}
+                    className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-4 py-2.5 rounded-xl transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft size={16} /> Trở lại Tab 2: Danh mục phụ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('photos')}
+                    className="flex items-center gap-2 text-sm font-bold text-purple-600 hover:text-purple-800 hover:bg-purple-50 px-4 py-2.5 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Sang Tab 4: Bộ sưu tập Hình ảnh <ArrowRight size={16} />
+                  </button>
                 </div>
               </div>
             )}
 
-            {/* Tab 3: Photos */}
-            {modalType === 'edit' && activeTab === 'photos' && (
-              <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* TAB 4: PHOTOS */}
+            {activeTab === 'photos' && (
+              <div className="flex-1 overflow-y-auto p-6 lg:p-8 flex flex-col justify-between space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start flex-1">
                   {/* Photo Gallery List */}
-                  <div className="lg:col-span-2 space-y-4">
-                    <h4 className="font-bold text-gray-900 text-base">Bộ sưu tập ảnh phụ</h4>
+                  <div className="lg:col-span-2 space-y-5">
+                    <h4 className="font-extrabold text-gray-900 text-lg flex items-center justify-between border-b border-gray-200 pb-3 flex-wrap gap-2">
+                      <span>Bộ sưu tập ảnh chi tiết</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowPhotosImportHelp(true)}
+                          className="flex items-center gap-1.5 bg-white hover:bg-purple-50 text-gray-700 hover:text-purple-800 border border-gray-300 hover:border-purple-300 font-bold px-3 py-1.5 rounded-xl transition-colors cursor-pointer text-xs shadow-2xs"
+                          title="Xem hướng dẫn định dạng file import hình ảnh"
+                        >
+                          <Info size={14} className="text-purple-600" />
+                          <span>Hướng dẫn mẫu</span>
+                        </button>
+                        <label className="flex items-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-300 font-bold px-3 py-1.5 rounded-xl transition-colors cursor-pointer text-xs shadow-2xs">
+                          <Upload size={14} />
+                          <span>Import File Ảnh (JSON/CSV)</span>
+                          <input
+                            type="file"
+                            ref={importPhotosInputRef}
+                            accept=".json,.csv"
+                            onChange={handleImportPhotosFile}
+                            className="hidden"
+                          />
+                        </label>
+                        <span className="text-xs font-bold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-xl">
+                          {placePhotos.length} hình ảnh
+                        </span>
+                      </div>
+                    </h4>
                     
                     {photosLoading ? (
-                      <div className="py-10 flex items-center justify-center text-gray-500">
-                        <Loader2 className="animate-spin text-blue-500 mr-2" size={24} />
-                        <span>Đang tải hình ảnh...</span>
+                      <div className="py-12 flex items-center justify-center text-gray-500">
+                        <Loader2 className="animate-spin text-blue-500 mr-2" size={26} />
+                        <span className="text-base font-semibold">Đang tải hình ảnh...</span>
                       </div>
                     ) : placePhotos.length === 0 ? (
-                      <div className="py-10 text-center text-gray-400 border border-dashed border-gray-200 rounded-xl">
+                      <div className="py-12 text-center text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl text-base">
                         Chưa có hình ảnh phụ nào cho địa điểm này.
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-5">
                         {placePhotos.map((photo) => (
-                          <div key={photo.id} className="relative group border border-gray-250 rounded-xl overflow-hidden bg-gray-50 shadow-xs flex flex-col justify-between">
+                          <div key={photo.id} className="relative group border border-gray-250 rounded-2xl overflow-hidden bg-gray-50 shadow-xs flex flex-col justify-between">
                             <div className="relative w-full aspect-video">
                               <img 
                                 src={photo.urlOriginal} 
@@ -1910,15 +2870,15 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                                   target.style.display = 'none';
                                   const parent = target.parentElement;
                                   if (parent) {
-                                    parent.classList.add('flex', 'flex-col', 'items-center', 'justify-center', 'bg-rose-50', 'p-2', 'text-center');
-                                    parent.innerHTML = '<div class="text-[11px] text-rose-600 font-bold">⚠️ Link ảnh hỏng</div><div class="text-[10px] text-gray-400 italic">Bấm 🗑️ để xóa</div>';
+                                    parent.classList.add('flex', 'flex-col', 'items-center', 'justify-center', 'bg-rose-50', 'p-3', 'text-center');
+                                    parent.innerHTML = '<div class="text-xs text-rose-600 font-bold">⚠️ Link ảnh hỏng</div><div class="text-[11px] text-gray-400 italic">Bấm 🗑️ để xóa</div>';
                                   }
                                 }}
                               />
                             </div>
                             
                             {photo.caption && (
-                              <div className="p-2 bg-white text-[11px] text-gray-650 line-clamp-1 border-t border-gray-100">
+                              <div className="p-3 bg-white text-xs font-medium text-gray-700 line-clamp-1 border-t border-gray-100">
                                 {photo.caption}
                               </div>
                             )}
@@ -1926,10 +2886,10 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                             <button
                               type="button"
                               onClick={() => handleDeletePhoto(Number(photo.id))}
-                              className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-red-600 text-white rounded-lg transition-colors cursor-pointer"
+                              className="absolute top-2.5 right-2.5 p-2 bg-black/60 hover:bg-red-600 text-white rounded-xl transition-colors cursor-pointer"
                               title="Xóa ảnh"
                             >
-                              <Trash2 size={12} />
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         ))}
@@ -1938,29 +2898,38 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                   </div>
 
                   {/* Add Photo Form */}
-                  <form onSubmit={handleAddPhoto} className="p-4 bg-gray-50/50 rounded-xl border border-gray-200 space-y-4 h-fit">
-                    <h4 className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
-                      <Plus size={16} className="text-blue-600" />
+                  <form onSubmit={handleAddPhoto} className="p-6 bg-gray-50/70 rounded-2xl border border-gray-200 space-y-5 h-fit shadow-xs">
+                    <h4 className="font-extrabold text-gray-900 text-base flex items-center gap-2 border-b border-gray-200 pb-3">
+                      <Plus size={18} className="text-blue-600" />
                       Thêm ảnh mới
                     </h4>
 
                     {photoError && (
-                      <div className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg p-2.5 font-medium flex items-center gap-1.5 animate-in fade-in duration-150">
-                        <AlertCircle size={14} className="shrink-0" />
+                      <div className="text-sm font-semibold text-rose-600 bg-rose-50 border border-rose-200 rounded-xl p-3 flex items-center gap-2 animate-in fade-in duration-150">
+                        <AlertCircle size={16} className="shrink-0" />
                         <span>{photoError}</span>
                       </div>
                     )}
 
-                    <div className="space-y-3 text-xs">
+                    <div className="space-y-4">
                       {/* Device File Picker Button */}
-                      <div className="space-y-1">
-                        <label className="font-semibold text-gray-750 block">Chọn ảnh từ máy tính</label>
+                      <div className="space-y-1.5">
+                        <label className="font-bold text-gray-800 text-sm block">Chọn ảnh từ máy tính</label>
                         <button
                           type="button"
+                          disabled={uploadingDetailPhoto || modalLoading}
                           onClick={() => detailPhotoInputRef.current?.click()}
-                          className="w-full flex items-center justify-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold px-3 py-2 rounded-lg border border-purple-200 text-xs transition-colors cursor-pointer"
+                          className="w-full flex items-center justify-center gap-2 bg-purple-50 hover:bg-purple-100 text-purple-700 font-extrabold px-4 py-2.5 rounded-xl border border-purple-200 text-sm transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
                         >
-                          <Upload size={14} /> Chọn ảnh từ máy...
+                          {uploadingDetailPhoto ? (
+                            <>
+                              <Loader2 size={16} className="animate-spin text-purple-700" /> Đang tải Cloudinary...
+                            </>
+                          ) : (
+                            <>
+                              <Upload size={16} /> Chọn ảnh từ máy...
+                            </>
+                          )}
                         </button>
                         <input
                           type="file"
@@ -1971,37 +2940,55 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
                         />
                       </div>
 
-                      <div className="space-y-1">
-                        <label className="font-semibold text-gray-750 block">Hoặc dán Link URL ảnh *</label>
+                      <div className="space-y-1.5">
+                        <label className="font-bold text-gray-800 text-sm block">Hoặc dán Link URL ảnh *</label>
                         <input
                           type="text"
                           required
                           value={newPhoto.urlOriginal}
                           onChange={(e) => setNewPhoto({ ...newPhoto, urlOriginal: e.target.value })}
                           placeholder="https://images.unsplash.com/... hoặc chọn ảnh ở trên"
-                          className="w-full text-xs text-gray-900 border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-blue-500"
+                          className="w-full text-sm text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 font-medium"
                         />
                       </div>
 
-                      <div className="space-y-1">
-                        <label className="font-semibold text-gray-750 block">Chú thích ảnh (Tùy chọn)</label>
+                      <div className="space-y-1.5">
+                        <label className="font-bold text-gray-800 text-sm block">Chú thích ảnh (Tùy chọn)</label>
                         <input
                           type="text"
                           value={newPhoto.caption}
                           onChange={(e) => setNewPhoto({ ...newPhoto, caption: e.target.value })}
                           placeholder="VD: View ngắm hoàng hôn, Không gian trong quán..."
-                          className="w-full text-xs text-gray-900 border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-blue-500"
+                          className="w-full text-sm text-gray-900 border border-gray-300 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:border-blue-600 font-medium"
                         />
                       </div>
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs transition-colors shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+                      className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold rounded-xl text-sm transition-colors shadow-xs cursor-pointer flex items-center justify-center gap-2"
                     >
-                      <Plus size={14} /> Thêm ảnh vào bộ sưu tập
+                      <Plus size={18} /> Thêm ảnh vào bộ sưu tập
                     </button>
                   </form>
+                </div>
+
+                {/* Footer Buttons for Tab 4: Photos */}
+                <div className="flex items-center justify-between pt-5 border-t border-gray-200 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('reviews')}
+                    className="flex items-center gap-2 text-sm font-bold text-amber-600 hover:text-amber-800 hover:bg-amber-50 px-4 py-2.5 rounded-xl transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft size={16} /> Trở lại Tab 3: Quản lý Đánh giá
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    className="px-7 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl transition-colors text-sm font-extrabold cursor-pointer shadow-md"
+                  >
+                    Hoàn tất
+                  </button>
                 </div>
               </div>
             )}
@@ -2019,7 +3006,7 @@ Yaki House Buffet,Buffet lẩu nướng,123 Đường 3/2 Cần Thơ,Quán ăn,1
               </div>
               <h3 className="font-bold text-gray-900 text-lg">Xóa địa điểm?</h3>
               <p className="text-gray-500 text-sm mt-2">
-                Hành động này không thể hoàn tác. Các đánh giá liên quan sẽ bị xóa khỏi cơ sở dữ liệu.
+                Hành động này không thể hoàn tác. Tất cả <strong>hình ảnh</strong>, <strong>đánh giá</strong> và <strong>lịch trình liên quan</strong> đến địa điểm này sẽ bị xóa sạch khỏi cơ sở dữ liệu.
               </p>
             </div>
 

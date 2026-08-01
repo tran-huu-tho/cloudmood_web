@@ -42,6 +42,7 @@ function MapCenterController({ center }: { center: [number, number] | null }) {
 }
 
 export default function MapPicker({ lat, lng, onChange }: MapPickerProps) {
+  const [isMounted, setIsMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -49,6 +50,7 @@ export default function MapPicker({ lat, lng, onChange }: MapPickerProps) {
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
 
   useEffect(() => {
+    setIsMounted(true);
     // Fix for missing marker icons in leaflet with Next.js
     delete (L.Icon.Default.prototype as any)._getIconUrl;
     L.Icon.Default.mergeOptions({
@@ -101,6 +103,14 @@ export default function MapPicker({ lat, lng, onChange }: MapPickerProps) {
 
   const defaultCenter: [number, number] = lat && lng ? [lat, lng] : [10.03022, 105.78753]; // default to Can Tho
 
+  if (!isMounted) {
+    return (
+      <div className="w-full h-full min-h-[260px] rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center text-xs text-gray-400">
+        Đang tải bản đồ...
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full min-h-[260px] rounded-lg overflow-hidden border border-gray-200 shadow-inner relative z-10">
       {/* Floating Search Bar positioned on top-right */}
@@ -149,6 +159,7 @@ export default function MapPicker({ lat, lng, onChange }: MapPickerProps) {
       </div>
 
       <MapContainer 
+        key={`map-container-${defaultCenter[0]}-${defaultCenter[1]}`}
         center={defaultCenter} 
         zoom={lat && lng ? 14 : 10} 
         scrollWheelZoom={true}

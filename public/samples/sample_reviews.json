@@ -1,0 +1,29 @@
+[
+  {
+    "authorName": "Nguyễn Thanh Tùng",
+    "authorAvatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80",
+    "authorLocation": "Hà Nội, Việt Nam",
+    "rating": 5,
+    "comment": "Dịch vụ xuất sắc, món ăn chế biến rất vừa vị và trình bày đẹp mắt!",
+    "publishedDate": "2026-01-22T09:15:00Z",
+    "source": "TRIPADVISOR"
+  },
+  {
+    "authorName": "Đặng Mai Phương",
+    "authorAvatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80",
+    "authorLocation": "TP. Hồ Chí Minh",
+    "rating": 5,
+    "comment": "Không gian sạch sẽ, bãi đỗ xe rộng rãi, gia đình mình rất hài lòng.",
+    "publishedDate": "2026-01-24T18:40:00Z",
+    "source": "TRIPADVISOR"
+  },
+  {
+    "authorName": "Vũ Minh Anh",
+    "authorAvatar": "",
+    "authorLocation": "Cần Thơ",
+    "rating": 4,
+    "comment": "Giá cả hợp lý so với chất lượng dịch vụ.",
+    "publishedDate": "2026-01-26T12:00:00Z",
+    "source": "LOCAL"
+  }
+]

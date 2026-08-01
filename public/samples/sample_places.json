@@ -1,0 +1,74 @@
+[
+  {
+    "name": "Nhà Hàng Lúa Nếp Cần Thơ",
+    "description": "Nhà hàng ẩm thực sông nước ẩm thực miền Tây nổi tiếng với góc nhìn ra sông Hậu thơ mộng.",
+    "address": "Khu Bãi Bồi Sông Hậu, Phường Cái Khế, Quận Ninh Kiều, Cần Thơ",
+    "categoryName": "Quán ăn",
+    "latitude": 10.046815,
+    "longitude": 105.789214,
+    "phone": "0907123456",
+    "website": "https://luanepcantho.com",
+    "tripadvisorUrl": "https://www.tripadvisor.com/Restaurant_Review-g303942-d12891234-Reviews-Lua_Nep_Restaurant-Can_Tho_Mekong_Delta.html",
+    "priceLevel": "MODERATE",
+    "rating": 4.7,
+    "userRatingCount": 230,
+    "subCategories": ["Ẩm thực miền Tây", "Sân vườn", "View sông"],
+    "openTime": "07:00",
+    "closeTime": "23:00",
+    "photos": [
+      "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80"
+    ],
+    "reviews": [
+      {
+        "authorName": "Lê Văn Hoài",
+        "rating": 5,
+        "comment": "Món ăn miền Tây đậm đà, không gian thoáng mát ven sông rất tuyệt vời!",
+        "authorAvatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80",
+        "authorLocation": "TP. Hồ Chí Minh",
+        "publishedDate": "2026-01-15T08:00:00Z",
+        "source": "TRIPADVISOR"
+      },
+      {
+        "authorName": "Phan Thị Bích",
+        "rating": 4,
+        "comment": "Quán đông khách vào buổi tối, lẩu mắm rất ngon.",
+        "authorLocation": "Cần Thơ",
+        "publishedDate": "2026-01-18T10:30:00Z",
+        "source": "LOCAL"
+      }
+    ]
+  },
+  {
+    "name": "Cà Phê Thủy Mộc Cần Thơ",
+    "description": "Quán cà phê sân vườn phong cách gỗ cổ kính với hồ cá KOI sinh động.",
+    "address": "228 Đường 3/2, Phường Hưng Lợi, Quận Ninh Kiều, Cần Thơ",
+    "categoryName": "Quán cà phê",
+    "latitude": 10.025112,
+    "longitude": 105.772314,
+    "phone": "02923891111",
+    "website": "https://thuymoccoffee.vn",
+    "tripadvisorUrl": "https://www.tripadvisor.com/Restaurant_Review-g303942-d15981111-Reviews-Thuy_Moc_Coffee-Can_Tho_Mekong_Delta.html",
+    "priceLevel": "$",
+    "rating": 4.5,
+    "userRatingCount": 180,
+    "subCategories": ["Cà phê sân vườn", "Hồ cá KOI", "Yên tĩnh"],
+    "openTime": "06:30",
+    "closeTime": "22:30",
+    "photos": [
+      "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80"
+    ],
+    "reviews": [
+      {
+        "authorName": "Trần Quốc Bảo",
+        "rating": 5,
+        "comment": "Không gian thư thái, đồ uống ngon và nhân viên thân thiện.",
+        "authorAvatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80",
+        "authorLocation": "Đà Nẵng",
+        "publishedDate": "2026-01-20T14:00:00Z",
+        "source": "TRIPADVISOR"
+      }
+    ]
+  }
+]

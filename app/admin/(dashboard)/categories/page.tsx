@@ -257,7 +257,7 @@ export default function CategoriesPage() {
               type="text"
               placeholder="Tìm kiếm danh mục..."
               value={searchQuery}
-              onChange={(e) => startTransition(() => setSearchQuery(e.target.value))}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="bg-white text-gray-900 text-sm rounded-lg pl-10 pr-4 py-2 border border-gray-200 focus:outline-none focus:border-blue-500 transition-colors w-full"
             />
           </div>
