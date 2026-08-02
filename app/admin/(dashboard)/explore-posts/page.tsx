@@ -26,7 +26,11 @@ import {
   ArrowDown,
   Image as ImageIcon,
   Globe,
-  Edit2
+  Edit2,
+  Clock,
+  Share2,
+  Calendar,
+  Maximize2
 } from 'lucide-react';
 import DestinationSearchInput from '@/components/admin/DestinationSearchInput';
 import AttachedPlacesManager from '@/components/admin/AttachedPlacesManager';
@@ -49,6 +53,7 @@ interface ExplorePost {
     fullName: string;
     email: string;
     avatar: string | null;
+    role?: boolean;
   };
   originalItinerary?: {
     id: number | string;
@@ -63,6 +68,16 @@ interface ExplorePost {
 }
 
 export default function ExplorePostsPage() {
+  const formatAddress = (text?: string | null) => {
+    if (!text) return '';
+    return text.replace(/\s*\b\d{4,6}\b/g, '').trim();
+  };
+
+  const stripLeadingEmoji = (text?: string | null) => {
+    if (!text) return '';
+    return text.replace(/^[\u{1F300}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\s]+/gu, '').trim();
+  };
+
   const [posts, setPosts] = useState<ExplorePost[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -101,10 +116,12 @@ export default function ExplorePostsPage() {
   const [platformUrl, setPlatformUrl] = useState('');
 
   const [editingBlogId, setEditingBlogId] = useState<number | string | null>(null);
+  const [editingPostAuthor, setEditingPostAuthor] = useState<{ id: number | string; fullName: string; email: string; avatar: string | null } | null>(null);
   const [modalTab, setModalTab] = useState<'info' | 'places'>('info');
 
   const handleOpenCreateModal = () => {
     setEditingBlogId(null);
+    setEditingPostAuthor(null);
     setSelectedImportGuideId('');
     setNewTitle('');
     setNewDescription('');
@@ -121,14 +138,25 @@ export default function ExplorePostsPage() {
 
   const handleEditPostClick = (post: ExplorePost) => {
     setEditingBlogId(post.id);
+    const rawAuthor = post.author || null;
+    const isUser = (rawAuthor && rawAuthor.role !== true && !rawAuthor.email?.toLowerCase().includes('admin') && rawAuthor.fullName !== 'CloudMood' && rawAuthor.fullName !== 'Biên tập viên Admin' && post.postType !== 'PLATFORM_CURATION') ? rawAuthor : null;
+    const author = isUser;
+    setEditingPostAuthor(author);
     setSelectedImportGuideId('');
     setNewTitle(post.title || '');
     setNewDescription(post.description || '');
     setNewDestination(post.destination || '');
     setNewCoverImage(post.coverImage || '');
-    setPlatformName(post.platformName || 'CloudMood');
-    setPlatformLogo(post.platformLogo || '/favicon.ico');
-    setPlatformUrl(post.platformUrl || '');
+
+    if (author) {
+      setPlatformName(author.fullName || post.platformName || '');
+      setPlatformLogo(author.avatar || post.platformLogo || '');
+      setPlatformUrl('');
+    } else {
+      setPlatformName(post.platformName || 'CloudMood');
+      setPlatformLogo(post.platformLogo || '/favicon.ico');
+      setPlatformUrl(post.platformUrl || '');
+    }
 
     const allItems = (post.items || []).map((i: any, index: number) => {
       if (i.itemType === 'SECTION_HEADER') {
@@ -371,9 +399,9 @@ export default function ExplorePostsPage() {
               coverImage: newCoverImage || selectedPlaces[0]?.image || '/logo-xoanen-cloudmood.png',
               postType: 'BLOG',
               status: 'PUBLISHED',
-              platformName: platformName.trim() || null,
-              platformLogo: platformLogo.trim() || null,
-              platformUrl: platformUrl.trim() || null,
+              platformName: editingPostAuthor ? (editingPostAuthor.fullName || null) : (platformName.trim() || null),
+              platformLogo: editingPostAuthor ? (editingPostAuthor.avatar || null) : (platformLogo.trim() || null),
+              platformUrl: editingPostAuthor ? null : (platformUrl.trim() || null),
               items,
             }),
           });
@@ -409,6 +437,7 @@ export default function ExplorePostsPage() {
       );
       setIsCreateOpen(false);
       setEditingBlogId(null);
+      setEditingPostAuthor(null);
       setSelectedImportGuideId('');
       setNewTitle('');
       setNewDescription('');
@@ -682,54 +711,67 @@ export default function ExplorePostsPage() {
           <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl w-full max-w-3xl max-h-[88vh] shadow-2xl flex flex-col overflow-hidden relative">
 
             {/* Banner Header with Image or Gradient */}
-            <div className="relative h-44 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 overflow-hidden shrink-0">
-              {(selectedPost.coverImage || selectedPost.items?.find((i: any) => i.place?.image)?.place?.image) && (
-                <img
-                  src={selectedPost.coverImage || selectedPost.items?.find((i: any) => i.place?.image)?.place?.image}
-                  alt="Cover"
-                  className="w-full h-full object-cover opacity-40 mix-blend-overlay"
-                />
-              )}
-              <button
-                onClick={() => setIsDetailOpen(false)}
-                className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-black/70 text-white rounded-full transition-colors cursor-pointer z-10"
-              >
-                <X size={20} />
-              </button>
-              <div className="absolute bottom-4 left-6 right-6 flex justify-between items-end text-white">
-                <div>
-                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-purple-600 text-white flex items-center gap-1 shadow-xs">
-                      <BookOpen size={12} /> Bài viết Blog (ExplorePost)
-                    </span>
-                    {selectedPost.originalItinerary ? (
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-indigo-500/80 text-white backdrop-blur-xs border border-indigo-300/30">
-                        📖 Từ Hướng dẫn (#{selectedPost.originalItinerary.id})
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-500/80 text-white backdrop-blur-xs border border-emerald-300/30">
-                        ✍️ Blog trực tiếp
-                      </span>
-                    )}
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-slate-800/80 text-slate-200 border border-slate-700">
-                      {selectedPost.status === 'PUBLISHED' || selectedPost.status === 'Công khai' ? '🟢 Công khai' : '🟡 Nháp'}
-                    </span>
-                  </div>
-                  <h2 className="text-2xl font-extrabold tracking-wide drop-shadow-md text-white">
-                    {selectedPost.title}
-                  </h2>
-                </div>
+            {(() => {
+              const coverUrl = selectedPost.coverImage || selectedPost.items?.find((i: any) => i.place?.image)?.place?.image;
+              return (
+                <div className="relative h-48 bg-slate-900 overflow-hidden shrink-0 group">
+                  {coverUrl ? (
+                    <img src={coverUrl} alt="Cover" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-black/20" />
+                  {coverUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setFullCoverPreviewUrl(coverUrl)}
+                      className="absolute top-4 left-4 px-3 py-1.5 bg-black/60 hover:bg-black/80 text-white rounded-full text-xs font-extrabold flex items-center gap-1.5 backdrop-blur-md border border-white/20 transition-all cursor-pointer z-10 shadow-md hover:scale-105"
+                    >
+                      <Maximize2 size={13} /> Xem ảnh bìa
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setIsDetailOpen(false)}
+                    className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-black/70 text-white rounded-full transition-colors cursor-pointer z-10"
+                  >
+                    <X size={20} />
+                  </button>
+                  <div className="absolute bottom-4 left-6 right-6 flex justify-between items-end text-white z-10">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-purple-600 text-white flex items-center gap-1 shadow-xs">
+                          <BookOpen size={12} /> Bài viết Blog (ExplorePost)
+                        </span>
+                        {selectedPost.originalItinerary ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-indigo-500/80 text-white backdrop-blur-xs border border-indigo-300/30 flex items-center gap-1">
+                            <BookOpen size={11} /> Từ Hướng dẫn (#{selectedPost.originalItinerary.id})
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-500/80 text-white backdrop-blur-xs border border-emerald-300/30 flex items-center gap-1">
+                            <Edit2 size={11} /> Blog trực tiếp
+                          </span>
+                        )}
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-slate-800/80 text-slate-200 border border-slate-700 flex items-center gap-1">
+                          {selectedPost.status === 'PUBLISHED' || selectedPost.status === 'Công khai' ? <><CheckCircle2 size={11} className="text-emerald-400" /> Công khai</> : <><Clock size={11} className="text-amber-400" /> Bản nháp</>}
+                        </span>
+                      </div>
+                      <h2 className="text-2xl font-extrabold tracking-wide drop-shadow-md text-white">
+                        {stripLeadingEmoji(selectedPost.title)}
+                      </h2>
+                    </div>
 
-                {selectedPost.destination && (
-                  <div className="text-right shrink-0">
-                    <span className="text-xs text-purple-200 block font-medium">Điểm đến</span>
-                    <span className="text-sm font-bold text-white flex items-center gap-1 justify-end">
-                      <MapPin size={14} className="text-purple-300" /> {selectedPost.destination}
-                    </span>
+                    {selectedPost.destination && (
+                      <div className="text-right shrink-0">
+                        <span className="text-xs text-purple-200 block font-medium">Điểm đến</span>
+                        <span className="text-sm font-bold text-white flex items-center gap-1 justify-end">
+                          <MapPin size={14} className="text-purple-300" /> {selectedPost.destination}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
+                </div>
+              );
+            })()}
 
             {/* Sub Header info bar */}
             <div className="px-6 py-3 bg-gray-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs">
@@ -749,16 +791,21 @@ export default function ExplorePostsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 text-gray-600 dark:text-slate-300 font-medium">
+              <div className="flex flex-wrap items-center gap-3 text-gray-600 dark:text-slate-300 font-medium">
                 <span className="flex items-center gap-1.5 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-800">
                   <Eye size={14} className="text-purple-500" /> {selectedPost.viewCount || 0} lượt xem
                 </span>
                 <span className="flex items-center gap-1.5 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-800 text-rose-600 dark:text-rose-400 font-bold">
                   <Heart size={14} fill="currentColor" /> {selectedPost._count?.likes || selectedPost.likeCount || 0} lượt thích
                 </span>
-                <span className="flex items-center gap-1.5 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-800">
-                  <Layers size={14} className="text-indigo-500" /> {selectedPost.items?.length || 0} mục nội dung
+                <span className="flex items-center gap-1.5 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-800 text-emerald-600 dark:text-emerald-400 font-bold">
+                  <Share2 size={14} /> {(selectedPost as any).shareCount || 0} chia sẻ
                 </span>
+                {(selectedPost as any).createdAt && (
+                  <span className="flex items-center gap-1.5 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-800 text-gray-500">
+                    <Calendar size={14} className="text-blue-500" /> {new Date((selectedPost as any).createdAt).toLocaleDateString('vi-VN')}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -790,10 +837,12 @@ export default function ExplorePostsPage() {
             <div className="p-6 overflow-y-auto space-y-4 flex-1 bg-white dark:bg-slate-900">
               {activeDetailTab === 'overview' && (
                 <>
-                  {selectedPost.description && (
+                  {selectedPost.description && selectedPost.description !== 'public' && selectedPost.description !== 'draft' && selectedPost.description.trim().length > 3 && (
                     <div className="p-4 rounded-2xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/30 text-xs text-gray-700 dark:text-slate-300 leading-relaxed italic relative">
-                      <span className="font-bold text-purple-700 dark:text-purple-400 non-italic block mb-1">💬 Mô tả bài viết:</span>
-                      "{selectedPost.description}"
+                      <span className="font-bold text-purple-700 dark:text-purple-400 non-italic flex items-center gap-1.5 mb-1">
+                        <FileText size={14} /> Mô tả bài viết:
+                      </span>
+                      "{stripLeadingEmoji(selectedPost.description)}"
                     </div>
                   )}
 
@@ -833,7 +882,7 @@ export default function ExplorePostsPage() {
                             <div className="w-7 h-7 rounded-lg bg-purple-100 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400 flex items-center justify-center font-bold shrink-0">
                               <Layers size={15} />
                             </div>
-                            <h4 className="font-bold text-sm text-gray-900 dark:text-slate-100">{sec.name}</h4>
+                            <h4 className="font-bold text-sm text-gray-900 dark:text-slate-100">{stripLeadingEmoji(sec.name)}</h4>
                           </div>
                           <span className="text-xs font-bold text-purple-600 dark:text-purple-400 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 px-2.5 py-1 rounded-xl">
                             {sec.items.length} mục
@@ -889,39 +938,72 @@ export default function ExplorePostsPage() {
                             }
 
                             const place = item.place;
+                            const review = item.featuredReview;
+
                             return (
-                              <div key={item.id || iIdx} className="p-3.5 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-purple-300 transition-all flex items-start gap-3 text-xs shadow-2xs">
-                                {place?.image ? (
-                                  <img src={place.image} alt={place.name} className="w-16 h-16 rounded-xl object-cover shrink-0 border border-gray-200 dark:border-slate-800" />
-                                ) : (
-                                  <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 font-bold">
-                                    <MapPin size={20} />
-                                  </div>
-                                )}
-
-                                <div className="flex-1 min-w-0 space-y-1">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <h5 className="font-bold text-sm text-gray-900 dark:text-slate-100 truncate">
-                                      {place?.name || contentText || 'Địa điểm bài viết'}
-                                    </h5>
-                                    {place?.rating && (
-                                      <span className="flex items-center gap-1 font-bold text-amber-500 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-lg border border-amber-200/50 text-[11px] shrink-0">
-                                        <Star size={12} fill="currentColor" /> {place.rating}
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  {(place?.address || place?.description) && (
-                                    <p className="text-xs text-gray-500 dark:text-slate-400 line-clamp-1">
-                                      {place?.address || place?.description}
-                                    </p>
+                              <div key={item.id || iIdx} className="p-3.5 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-purple-300 transition-all text-xs shadow-2xs space-y-2.5">
+                                <div className="flex items-start gap-3">
+                                  {place?.image ? (
+                                    <img src={place.image} alt={place.name} className="w-16 h-16 rounded-xl object-cover shrink-0 border border-gray-200 dark:border-slate-800" />
+                                  ) : (
+                                    <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 font-bold">
+                                      <MapPin size={20} />
+                                    </div>
                                   )}
 
-                                  <div className="flex items-center gap-3 pt-0.5 text-[11px] text-gray-400">
-                                    {place?.phone && <span>📞 {place.phone}</span>}
-                                    {place?.website && <a href={place.website} target="_blank" rel="noreferrer" className="text-purple-600 hover:underline flex items-center gap-0.5">🌐 Website <ExternalLink size={10} /></a>}
+                                  <div className="flex-1 min-w-0 space-y-1">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <h5 className="font-bold text-sm text-gray-900 dark:text-slate-100 truncate">
+                                          {place?.name || contentText || 'Địa điểm bài viết'}
+                                        </h5>
+                                        {place?.category?.name && (
+                                          <span className="px-2 py-0.5 bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 font-bold text-[10px] rounded-md shrink-0 border border-purple-200/50">
+                                            {place.category.name}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {place?.rating && (
+                                        <span className="flex items-center gap-1 font-bold text-amber-500 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-lg border border-amber-200/50 text-[11px] shrink-0">
+                                          <Star size={12} fill="currentColor" /> {place.rating} {place.userRatingCount ? `(${place.userRatingCount})` : ''}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {(place?.address || place?.description) && (
+                                      <p className="text-xs text-gray-500 dark:text-slate-400 line-clamp-1">
+                                        {formatAddress(place?.address) || place?.description}
+                                      </p>
+                                    )}
+
+                                    <div className="flex items-center gap-3 pt-0.5 text-[11px] text-gray-400">
+                                      {place?.phone && <span className="flex items-center gap-1"><Globe size={11} /> {place.phone}</span>}
+                                      {place?.website && <a href={place.website} target="_blank" rel="noreferrer" className="text-purple-600 hover:underline flex items-center gap-0.5"><Globe size={11} /> Website <ExternalLink size={10} /></a>}
+                                    </div>
                                   </div>
                                 </div>
+
+                                {/* Featured Review Card */}
+                                {review && (
+                                  <div className="p-3 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/40 rounded-xl space-y-1 text-xs">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-5 h-5 rounded-full bg-amber-200 dark:bg-amber-900 overflow-hidden flex items-center justify-center font-bold text-[10px] text-amber-800 shrink-0">
+                                          {review.authorAvatar ? <img src={review.authorAvatar} alt="Avatar" className="w-full h-full object-cover" /> : (review.authorName || 'R')[0].toUpperCase()}
+                                        </div>
+                                        <span className="font-bold text-gray-900 dark:text-slate-100 text-[11px]">{review.authorName || 'Đánh giá từ du khách'}</span>
+                                      </div>
+                                      {review.rating && (
+                                        <span className="flex items-center gap-1 font-bold text-amber-500 text-[11px]">
+                                          <Star size={11} fill="currentColor" /> {review.rating}/5
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-gray-600 dark:text-slate-300 italic pl-7 text-[11px] leading-relaxed">
+                                      "{review.comment}"
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
@@ -963,15 +1045,37 @@ export default function ExplorePostsPage() {
                       </div>
 
                       {/* Interaction Stats */}
-                      <div className="p-4 rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 space-y-1 text-xs">
-                        <span className="font-bold text-gray-900 dark:text-slate-100 block">Thống kê tương tác</span>
-                        <span className="text-gray-500 block">👁️ Lượt xem: <strong>{selectedPost.viewCount || 0}</strong></span>
-                        <span className="text-gray-500 block">❤️ Lượt thích: <strong>{selectedPost._count?.likes || selectedPost.likeCount || 0}</strong></span>
+                      <div className="p-4 rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 space-y-1.5 text-xs">
+                        <span className="font-bold text-gray-900 dark:text-slate-100 block mb-1">Thống kê tương tác & Thời gian</span>
+                        <div className="grid grid-cols-2 gap-2 text-gray-600 dark:text-slate-300">
+                          <span className="flex items-center gap-1"><Eye size={13} className="text-purple-500" /> Xem: <strong>{selectedPost.viewCount || 0}</strong></span>
+                          <span className="flex items-center gap-1"><Heart size={13} className="text-rose-500" /> Thích: <strong>{selectedPost._count?.likes || selectedPost.likeCount || 0}</strong></span>
+                          <span className="flex items-center gap-1"><Share2 size={13} className="text-emerald-500" /> Chia sẻ: <strong>{(selectedPost as any).shareCount || 0}</strong></span>
+                          {(selectedPost as any).createdAt && <span className="flex items-center gap-1"><Calendar size={13} className="text-blue-500" /> Ngày: <strong>{new Date((selectedPost as any).createdAt).toLocaleDateString('vi-VN')}</strong></span>}
+                        </div>
                       </div>
                     </div>
 
-                    {/* External Source Card */}
-                    {(selectedPost.platformName || selectedPost.platformUrl) && (
+                    {/* External Source Card / User Author Card */}
+                    {selectedPost.author ? (
+                      <div className="p-4 rounded-2xl border border-purple-200 dark:border-purple-900/40 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/30 dark:to-indigo-950/30 flex items-center gap-3">
+                        {selectedPost.author.avatar ? (
+                          <img src={selectedPost.author.avatar} alt={selectedPost.author.fullName} className="w-8 h-8 object-cover rounded-full border border-purple-200 shrink-0" />
+                        ) : (
+                          <User size={18} className="text-purple-600 shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <span className="text-xs font-bold text-gray-900 dark:text-slate-100 block">
+                            Nguồn bài viết (Tác giả): {selectedPost.author.fullName}
+                          </span>
+                          {selectedPost.author.email && (
+                            <span className="text-[11px] text-gray-500 dark:text-slate-400 block truncate">
+                              {selectedPost.author.email}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ) : (selectedPost.platformName || selectedPost.platformUrl) && (
                       <div className="p-4 rounded-2xl border border-purple-200 dark:border-purple-900/40 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/30 dark:to-indigo-950/30 space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2.5 min-w-0">
@@ -1131,82 +1235,121 @@ export default function ExplorePostsPage() {
                   </div>
 
                   {/* Platform / Source Section */}
-                  <div className="space-y-2 border-t border-gray-100 dark:border-slate-800 pt-3">
-                    <label className="block text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <Globe size={14} /> Nguồn bài viết (Source Platform)
-                      </span>
-                      <span className="text-[10px] text-gray-400 font-normal">Tự điền hoặc chọn mẫu có sẵn</span>
-                    </label>
+                  {editingPostAuthor ? (
+                    <div className="space-y-2 border-t border-gray-100 dark:border-slate-800 pt-3">
+                      <label className="block text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <User size={14} /> Tác giả bài viết (Người dùng)
+                        </span>
+                        <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">Giữ nguyên thông tin người dùng làm nguồn</span>
+                      </label>
 
-                    {/* Presets */}
-                    <div className="flex flex-wrap gap-1.5">
-                      {[
-                        { name: 'CloudMood', logo: '/favicon.ico' },
-                        { name: 'Google', logo: 'https://cdn-icons-png.flaticon.com/512/300/300221.png' },
-                        { name: 'Facebook', logo: 'https://cdn-icons-png.flaticon.com/512/5968/5968764.png' },
-                        { name: 'YouTube', logo: 'https://cdn-icons-png.flaticon.com/512/1384/1384060.png' },
-                        { name: 'TikTok', logo: 'https://cdn-icons-png.flaticon.com/512/3046/3046124.png' },
-                        { name: 'TripAdvisor', logo: 'https://cdn-icons-png.flaticon.com/512/2504/2504944.png' },
-                      ].map((p) => (
-                        <button
-                          key={p.name}
-                          type="button"
-                          onClick={() => {
-                            setPlatformName(p.name);
-                            setPlatformLogo(p.logo);
-                          }}
-                          className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
-                            platformName === p.name
-                              ? 'bg-purple-100 border-purple-500 text-purple-700 dark:bg-purple-950 dark:text-purple-300 shadow-2xs'
-                              : 'bg-gray-50 dark:bg-slate-950 border-gray-200 dark:border-slate-800 text-gray-600 dark:text-slate-400 hover:border-purple-300'
-                          }`}
-                        >
-                          <img src={p.logo} alt={p.name} className="w-3.5 h-3.5 object-contain" />
-                          {p.name}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* 3 Explicit Inputs: Tên Nguồn, Avatar URL, Link URL */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pt-1">
-                      <div>
-                        <input
-                          type="text"
-                          placeholder="Tên Nguồn (VD: Facebook...)"
-                          value={platformName}
-                          onChange={(e) => setPlatformName(e.target.value)}
-                          className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                        />
-                      </div>
-                      <div className="relative flex items-center">
-                        <input
-                          type="text"
-                          placeholder="URL Avatar / Logo Nguồn..."
-                          value={platformLogo}
-                          onChange={(e) => setPlatformLogo(e.target.value)}
-                          className="w-full pl-3 pr-8 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                        />
-                        {platformLogo && (
+                      <div className="flex items-center gap-3 p-3 bg-purple-50/60 dark:bg-purple-950/30 border border-purple-100 dark:border-purple-900/40 rounded-xl">
+                        {editingPostAuthor.avatar ? (
                           <img
-                            src={platformLogo}
-                            alt="Avatar Preview"
-                            className="absolute right-2 w-5 h-5 object-contain rounded-full border border-purple-200 bg-white p-0.5 shrink-0"
+                            src={editingPostAuthor.avatar}
+                            alt={editingPostAuthor.fullName}
+                            className="w-10 h-10 rounded-full object-cover border-2 border-purple-200 shadow-2xs shrink-0"
                             onError={(e) => ((e.target as HTMLElement).style.display = 'none')}
                           />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-purple-200 dark:bg-purple-900 flex items-center justify-center text-purple-700 dark:text-purple-300 font-bold text-sm border-2 border-purple-300 shrink-0">
+                            {editingPostAuthor.fullName?.charAt(0).toUpperCase() || 'U'}
+                          </div>
                         )}
-                      </div>
-                      <div>
-                        <input
-                          type="text"
-                          placeholder="Link Nguồn (https://...)"
-                          value={platformUrl}
-                          onChange={(e) => setPlatformUrl(e.target.value)}
-                          className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                        />
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-gray-900 dark:text-slate-100 flex items-center gap-1.5">
+                            {editingPostAuthor.fullName}
+                            {editingPostAuthor.email && (
+                              <span className="text-[10px] font-normal text-gray-400 dark:text-slate-500 truncate">
+                                ({editingPostAuthor.email})
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">
+                            Bài đăng của người dùng - Nguồn bài viết hiển thị tên và avatar của tác giả.
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="space-y-2 border-t border-gray-100 dark:border-slate-800 pt-3">
+                      <label className="block text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Globe size={14} /> Nguồn bài viết (Source Platform)
+                        </span>
+                        <span className="text-[10px] text-gray-400 font-normal">Tự điền hoặc chọn mẫu có sẵn</span>
+                      </label>
+
+                      {/* Presets */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { name: 'CloudMood', logo: '/favicon.ico' },
+                          { name: 'Google', logo: 'https://cdn-icons-png.flaticon.com/512/300/300221.png' },
+                          { name: 'Facebook', logo: 'https://cdn-icons-png.flaticon.com/512/5968/5968764.png' },
+                          { name: 'YouTube', logo: 'https://cdn-icons-png.flaticon.com/512/1384/1384060.png' },
+                          { name: 'TikTok', logo: 'https://cdn-icons-png.flaticon.com/512/3046/3046124.png' },
+                          { name: 'TripAdvisor', logo: 'https://cdn-icons-png.flaticon.com/512/2504/2504944.png' },
+                        ].map((p) => (
+                          <button
+                            key={p.name}
+                            type="button"
+                            onClick={() => {
+                              setPlatformName(p.name);
+                              setPlatformLogo(p.logo);
+                            }}
+                            className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
+                              platformName === p.name
+                                ? 'bg-purple-100 border-purple-500 text-purple-700 dark:bg-purple-950 dark:text-purple-300 shadow-2xs'
+                                : 'bg-gray-50 dark:bg-slate-950 border-gray-200 dark:border-slate-800 text-gray-600 dark:text-slate-400 hover:border-purple-300'
+                            }`}
+                          >
+                            <img src={p.logo} alt={p.name} className="w-3.5 h-3.5 object-contain" />
+                            {p.name}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* 3 Explicit Inputs: Tên Nguồn, Avatar URL, Link URL */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pt-1">
+                        <div>
+                          <input
+                            type="text"
+                            placeholder="Tên Nguồn (VD: Facebook...)"
+                            value={platformName}
+                            onChange={(e) => setPlatformName(e.target.value)}
+                            className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                          />
+                        </div>
+                        <div className="relative flex items-center">
+                          <input
+                            type="text"
+                            placeholder="URL Avatar / Logo Nguồn..."
+                            value={platformLogo}
+                            onChange={(e) => setPlatformLogo(e.target.value)}
+                            className="w-full pl-3 pr-8 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                          />
+                          {platformLogo && (
+                            <img
+                              src={platformLogo}
+                              alt="Avatar Preview"
+                              className="absolute right-2 w-5 h-5 object-contain rounded-full border border-purple-200 bg-white p-0.5 shrink-0"
+                              onError={(e) => ((e.target as HTMLElement).style.display = 'none')}
+                            />
+                          )}
+                        </div>
+                        <div>
+                          <input
+                            type="text"
+                            placeholder="Link Nguồn (https://...)"
+                            value={platformUrl}
+                            onChange={(e) => setPlatformUrl(e.target.value)}
+                            className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Cover Image Upload & URL Section */}
                   <div className="p-4 rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/30 space-y-3">

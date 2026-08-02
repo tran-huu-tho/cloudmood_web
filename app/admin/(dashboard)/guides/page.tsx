@@ -16,7 +16,14 @@ import {
   Share2,
   FileText,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  Users,
+  Compass,
+  Star,
+  Clock,
+  Phone,
+  Globe,
+  Maximize2
 } from 'lucide-react';
 
 interface CreatorUser {
@@ -64,6 +71,7 @@ export default function GuidesPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Detail Modal State
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [selectedGuideDetail, setSelectedGuideDetail] = useState<any>(null);
@@ -364,33 +372,173 @@ export default function GuidesPage() {
       {/* Guide Saved Places Detail Modal */}
       {isDetailOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl w-full max-w-3xl max-h-[85vh] shadow-2xl overflow-hidden flex flex-col relative animate-in scale-in-95 duration-200">
-            <div className="p-6 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between bg-gray-50/50 dark:bg-slate-950/50">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-slate-100">
-                  {selectedGuideDetail?.title}
-                </h3>
-                <p className="text-xs text-gray-500 mt-1">Danh sách địa điểm lưu gợi ý trong bài Hướng dẫn</p>
+          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl w-full max-w-3xl max-h-[88vh] shadow-2xl flex flex-col overflow-hidden relative">
+
+            {detailLoading ? (
+              <div className="py-24 text-center">
+                <Loader2 className="animate-spin text-indigo-600 mx-auto" size={36} />
+                <p className="text-xs text-gray-500 font-semibold mt-3">Đang tải chi tiết bài Hướng dẫn...</p>
               </div>
-              <button onClick={() => setIsDetailOpen(false)} className="p-2 text-gray-400 hover:text-gray-600 rounded-xl cursor-pointer">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-3">
-              {selectedGuideDetail?.savedPlaces?.length === 0 ? (
-                <p className="text-gray-400 italic text-sm">Chưa có địa điểm gợi ý.</p>
-              ) : (
-                selectedGuideDetail?.savedPlaces?.map((sp: any) => (
-                  <div key={sp.id} className="p-4 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-950 flex items-start gap-3">
-                    <MapPin size={20} className="text-indigo-500 shrink-0 mt-0.5" />
+            ) : selectedGuideDetail ? (
+              <>
+                {/* Banner & Header */}
+                {(() => {
+                  const coverUrl = selectedGuideDetail.coverImage || selectedGuideDetail.savedPlaces?.find((sp: any) => sp.place?.image)?.place?.image;
+                  return (
+                    <div className="relative h-48 bg-slate-900 overflow-hidden shrink-0 group">
+                      {coverUrl ? (
+                        <img src={coverUrl} alt="Cover" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-r from-indigo-900 via-purple-900 to-slate-900" />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-black/20" />
+                      {coverUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewImageUrl(coverUrl)}
+                          className="absolute top-4 left-4 px-3 py-1.5 bg-black/60 hover:bg-black/80 text-white rounded-full text-xs font-extrabold flex items-center gap-1.5 backdrop-blur-md border border-white/20 transition-all cursor-pointer z-10 shadow-md hover:scale-105"
+                        >
+                          <Maximize2 size={13} /> Xem ảnh bìa
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setIsDetailOpen(false)}
+                        className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-black/70 text-white rounded-full transition-colors cursor-pointer z-10"
+                      >
+                        <X size={20} />
+                      </button>
+                      <div className="absolute bottom-4 left-6 right-6 flex justify-between items-end text-white z-10">
                     <div>
-                      <h5 className="font-bold text-sm text-gray-900 dark:text-slate-100">{sp.place?.name || 'Mục ghi chú'}</h5>
-                      <p className="text-xs text-gray-500 mt-1">{sp.noteText || sp.place?.address || 'Không có ghi chú thêm'}</p>
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-indigo-600 text-white flex items-center gap-1 shadow-xs">
+                          <BookOpen size={12} /> Hướng dẫn du lịch
+                        </span>
+                        {selectedGuideDetail.companion && (
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-purple-500/80 text-white backdrop-blur-xs border border-purple-300/30 flex items-center gap-1">
+                            <Users size={11} /> {selectedGuideDetail.companion === 'Riêng tư' ? 'Đi một mình' : selectedGuideDetail.companion}
+                          </span>
+                        )}
+                        {selectedGuideDetail.pace && (
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-indigo-500/80 text-white backdrop-blur-xs border border-indigo-300/30 flex items-center gap-1">
+                            <Compass size={11} /> {selectedGuideDetail.pace}
+                          </span>
+                        )}
+                        <span className="text-xs text-indigo-200 font-semibold flex items-center gap-1">
+                          <MapPin size={12} /> {selectedGuideDetail.destination}
+                        </span>
+                      </div>
+                      <h2 className="text-2xl font-extrabold tracking-wide drop-shadow-md">
+                        {selectedGuideDetail.title}
+                      </h2>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="text-xs text-slate-300 block">Địa điểm gợi ý</span>
+                      <span className="text-lg font-black text-amber-400">
+                        {selectedGuideDetail.savedPlaces?.length || 0} địa điểm
+                      </span>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                </div>
+              );
+            })()}
+
+                {/* Sub Header info bar */}
+                <div className="px-6 py-3 bg-gray-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-950 overflow-hidden shrink-0 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center font-bold text-xs text-indigo-600 dark:text-indigo-300">
+                      {selectedGuideDetail.user?.avatar ? (
+                        <img src={selectedGuideDetail.user.avatar} alt="User" className="w-full h-full object-cover" />
+                      ) : (
+                        (selectedGuideDetail.user?.fullName || 'T')[0].toUpperCase()
+                      )}
+                    </div>
+                    <div>
+                      <span className="font-bold text-gray-900 dark:text-slate-100 block">{selectedGuideDetail.user?.fullName || 'Tác giả'}</span>
+                      <span className="text-gray-400 block">{selectedGuideDetail.user?.email || 'N/A'}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-gray-600 dark:text-slate-300 font-medium">
+                    <span className="flex items-center gap-1 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-800">
+                      <MapPin size={13} className="text-indigo-500" /> {selectedGuideDetail.destination}
+                    </span>
+                    <span className="flex items-center gap-1 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-800">
+                      <Layers size={13} className="text-purple-500" /> {selectedGuideDetail.savedPlaces?.length || 0} địa điểm
+                    </span>
+                  </div>
+                </div>
+
+                {/* Content body */}
+                <div className="p-6 flex-1 overflow-y-auto space-y-4">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    Danh sách địa điểm gợi ý ({selectedGuideDetail.savedPlaces?.length || 0})
+                  </h4>
+
+                  {selectedGuideDetail.savedPlaces?.length === 0 ? (
+                    <p className="text-gray-400 italic text-sm text-center py-6">Chưa có địa điểm gợi ý.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {selectedGuideDetail.savedPlaces?.map((sp: any) => {
+                        const place = sp.place;
+                        return (
+                          <div key={sp.id} className="p-4 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-start gap-3.5 text-xs shadow-2xs">
+                            {place?.image ? (
+                              <img src={place.image} alt={place.name} className="w-16 h-16 rounded-xl object-cover shrink-0 border border-gray-200 dark:border-slate-800" />
+                            ) : (
+                              <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 font-bold">
+                                <MapPin size={20} />
+                              </div>
+                            )}
+
+                            <div className="flex-1 min-w-0 space-y-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <h5 className="font-bold text-sm text-gray-900 dark:text-slate-100 truncate">
+                                    {place?.name || 'Mục ghi chú'}
+                                  </h5>
+                                  {place?.category?.name && (
+                                    <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] rounded-md shrink-0 border border-indigo-200/50">
+                                      {place.category.name}
+                                    </span>
+                                  )}
+                                </div>
+                                {place?.rating && (
+                                  <span className="flex items-center gap-1 font-bold text-amber-500 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-lg border border-amber-200/50 text-[11px] shrink-0">
+                                    <Star size={12} fill="currentColor" /> {place.rating} {place.userRatingCount ? `(${place.userRatingCount})` : ''}
+                                  </span>
+                                )}
+                              </div>
+
+                              {(sp.noteText || place?.address || place?.description) && (
+                                <p className="text-xs text-gray-600 dark:text-slate-300">
+                                  {sp.noteText || place?.address || place?.description}
+                                </p>
+                              )}
+
+                              <div className="flex items-center gap-3 pt-1 text-[11px] text-gray-400">
+                                {place?.phone && <span className="flex items-center gap-1"><Phone size={11} /> {place.phone}</span>}
+                                {place?.website && <a href={place.website} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline flex items-center gap-0.5"><Globe size={11} /> Website <ExternalLink size={10} /></a>}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-4 border-t border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-950 flex justify-end">
+                  <button
+                    onClick={() => setIsDetailOpen(false)}
+                    className="px-5 py-2 border border-gray-200 dark:border-slate-800 text-xs font-bold rounded-xl text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-900 transition-colors cursor-pointer"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
       )}
@@ -472,6 +620,42 @@ export default function GuidesPage() {
                 Xóa vĩnh viễn
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Full Cover Image Preview Lightbox Modal */}
+      {previewImageUrl && (
+        <div
+          className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[99999] p-4 animate-in fade-in duration-200 cursor-zoom-out"
+          onClick={() => setPreviewImageUrl(null)}
+        >
+          <div
+            className="relative max-w-5xl max-h-[90vh] flex flex-col items-center justify-center pointer-events-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute -top-12 right-0 flex items-center gap-3 text-white">
+              <a
+                href={previewImageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5"
+              >
+                <ExternalLink size={13} /> Mở tab mới
+              </a>
+              <button
+                type="button"
+                onClick={() => setPreviewImageUrl(null)}
+                className="p-1.5 bg-white/20 hover:bg-rose-600 rounded-full text-white transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <img
+              src={previewImageUrl}
+              alt="Full Cover Preview"
+              className="max-w-full max-h-[85vh] rounded-2xl object-contain shadow-2xl border border-white/20"
+            />
           </div>
         </div>
       )}

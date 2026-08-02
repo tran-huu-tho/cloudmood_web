@@ -33,6 +33,7 @@ import {
   ExternalLink,
   ShieldCheck,
   AlertCircle,
+  ChevronDown,
   Phone,
   Globe,
   Lock,
@@ -50,7 +51,12 @@ import {
   Ship,
   Plane,
   Landmark,
-  Receipt
+  Receipt,
+  Zap,
+  Edit3,
+  Wallet,
+  MessageSquare,
+  Maximize2
 } from 'lucide-react';
 import DestinationSearchInput from '@/components/admin/DestinationSearchInput';
 import AttachedPlacesManager from '@/components/admin/AttachedPlacesManager';
@@ -60,7 +66,16 @@ interface CreatorUser {
   fullName: string;
   email: string;
   avatar: string | null;
+  role?: boolean;
 }
+
+const checkIsRegularUserPost = (u?: CreatorUser | null, postType?: string) => {
+  if (!u) return false;
+  if (postType === 'PLATFORM_CURATION') return false;
+  if (u.role === true || (u.email && u.email.toLowerCase().includes('admin'))) return false;
+  if (u.fullName === 'CloudMood' || u.fullName === 'Biên tập viên Admin') return false;
+  return true;
+};
 
 interface Itinerary {
   id: number | string;
@@ -191,6 +206,12 @@ export default function ItinerariesPage() {
     return text.replace(/\s*\b\d{4,6}\b/g, '').trim();
   };
 
+  // Helper to remove raw emojis from start of string
+  const stripLeadingEmoji = (text?: string | null) => {
+    if (!text) return '';
+    return text.replace(/^[\u{1F300}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\s]+/gu, '').trim();
+  };
+
   // Helper to group saved places by section (ItinerarySection)
   const groupSavedPlacesBySection = (sections: any[] = [], savedPlaces: any[] = []) => {
     const sectionMap = new Map<string, { section: any; items: any[] }>();
@@ -295,13 +316,32 @@ export default function ItinerariesPage() {
 
   // Helper to get privacy status badge info (Công khai, Bạn bè, Riêng tư)
   const getPrivacyBadgeInfo = (item?: any, trip?: any) => {
+    const obj = item || trip || {};
+    
+    // Check explicit boolean isPublic first
+    if (obj.isPublic === true) {
+      return {
+        key: 'public',
+        label: 'Công khai',
+        icon: <Globe size={13} className="text-sky-600 dark:text-sky-400 shrink-0" />,
+        badgeClass: 'bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 border-sky-200 dark:border-sky-900/60',
+        bannerBadgeClass: 'bg-sky-600/90 text-white border-sky-400/30'
+      };
+    }
+    if (obj.isPublic === false) {
+      return {
+        key: 'private',
+        label: 'Riêng tư',
+        icon: <Lock size={13} className="text-rose-600 dark:text-rose-400 shrink-0" />,
+        badgeClass: 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-900/60',
+        bannerBadgeClass: 'bg-rose-600/90 text-white border-rose-400/30'
+      };
+    }
+
     const raw = (
-      item?.privacy ||
-      item?.privacyLevel ||
-      item?.visibility ||
-      trip?.companion ||
-      trip?.privacy ||
-      trip?.privacyLevel ||
+      obj.privacy ||
+      obj.privacyLevel ||
+      obj.visibility ||
       ''
     ).toString().toLowerCase().trim();
 
@@ -322,13 +362,13 @@ export default function ItinerariesPage() {
         bannerBadgeClass: 'bg-rose-600/90 text-white border-rose-400/30'
       };
     }
-    // Default to 'Bạn bè' (Friends)
+    // Default to 'Riêng tư' if isPublic is false/null for user trips
     return {
-      key: 'friends',
-      label: 'Bạn bè',
-      icon: <Users size={13} className="text-amber-600 dark:text-amber-400 shrink-0" />,
-      badgeClass: 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-900/60',
-      bannerBadgeClass: 'bg-amber-600/90 text-white border-amber-400/30'
+      key: 'private',
+      label: 'Riêng tư',
+      icon: <Lock size={13} className="text-rose-600 dark:text-rose-400 shrink-0" />,
+      badgeClass: 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-900/60',
+      bannerBadgeClass: 'bg-rose-600/90 text-white border-rose-400/30'
     };
   };
 
@@ -627,8 +667,11 @@ export default function ItinerariesPage() {
   const [isTripDetailOpen, setIsTripDetailOpen] = useState(false);
   const [tripDetailLoading, setTripDetailLoading] = useState(false);
   const [selectedTripDetail, setSelectedTripDetail] = useState<any>(null);
-  const [tripDetailActiveTab, setTripDetailActiveTab] = useState<'days' | 'overview' | 'expenses' | 'members'>('days');
+  const [tripDetailActiveTab, setTripDetailActiveTab] = useState<'days' | 'expenses' | 'members'>('days');
   const [guideDetailActiveTab, setGuideDetailActiveTab] = useState<'overview' | 'members'>('overview');
+
+  // Cover Image Lightbox Preview State
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   // Place Detail Modal State
   const [selectedPlaceItem, setSelectedPlaceItem] = useState<any>(null);
@@ -725,6 +768,36 @@ export default function ItinerariesPage() {
   const [blogTitle, setBlogTitle] = useState('');
   const [blogDescription, setBlogDescription] = useState('');
   const [exportBlogLoading, setExportBlogLoading] = useState(false);
+
+  // Delete Guide state
+  const [isDeleteGuideOpen, setIsDeleteGuideOpen] = useState(false);
+  const [deletingGuideId, setDeletingGuideId] = useState<number | string | null>(null);
+  const [deleteGuideLoading, setDeleteGuideLoading] = useState(false);
+
+  const handleOpenDeleteGuide = (id: number | string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setDeletingGuideId(id);
+    setIsDeleteGuideOpen(true);
+  };
+
+  const handleDeleteGuide = async () => {
+    if (!deletingGuideId) return;
+    setDeleteGuideLoading(true);
+    try {
+      const res = await fetch(`/api/admin/itineraries/${deletingGuideId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Không thể xóa bài Hướng dẫn du lịch.');
+      showToast('Đã xóa bài Hướng dẫn du lịch thành công!', 'success');
+      setIsDeleteGuideOpen(false);
+      setDeletingGuideId(null);
+      fetchGuides();
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi khi xóa bài Hướng dẫn.', 'error');
+    } finally {
+      setDeleteGuideLoading(false);
+    }
+  };
 
   const fetchGuides = async () => {
     setGuidesLoading(true);
@@ -823,10 +896,12 @@ export default function ItinerariesPage() {
   const [platformUrl, setPlatformUrl] = useState('');
 
   const [editingBlogId, setEditingBlogId] = useState<number | string | null>(null);
+  const [editingBlogAuthor, setEditingBlogAuthor] = useState<CreatorUser | null>(null);
   const [modalBlogTab, setModalBlogTab] = useState<'info' | 'places'>('info');
 
   const handleOpenCreateBlogModal = () => {
     setEditingBlogId(null);
+    setEditingBlogAuthor(null);
     setSelectedImportGuideId('');
     setNewBlogTitle('');
     setNewBlogDesc('');
@@ -844,14 +919,25 @@ export default function ItinerariesPage() {
 
   const handleEditBlogClick = (b: ExplorePost) => {
     setEditingBlogId(b.id);
+    const rawAuthor = b.author || (b as any).user || null;
+    const isUser = checkIsRegularUserPost(rawAuthor, b.postType);
+    const author = isUser ? rawAuthor : null;
+    setEditingBlogAuthor(author);
     setSelectedImportGuideId('');
     setNewBlogTitle(b.title || '');
     setNewBlogDesc(b.description || '');
     setNewBlogDest(b.destination || '');
     setNewBlogCover(b.coverImage || '');
-    setPlatformName(b.platformName || 'CloudMood');
-    setPlatformLogo(b.platformLogo || '/favicon.ico');
-    setPlatformUrl(b.platformUrl || '');
+
+    if (author) {
+      setPlatformName(author.fullName || b.platformName || '');
+      setPlatformLogo(author.avatar || b.platformLogo || '');
+      setPlatformUrl('');
+    } else {
+      setPlatformName(b.platformName || 'CloudMood');
+      setPlatformLogo(b.platformLogo || '/favicon.ico');
+      setPlatformUrl(b.platformUrl || '');
+    }
 
     const allItems = (b.items || []).map((i: any, index: number) => {
       const rawType = (i.itemType || '').toUpperCase();
@@ -1106,9 +1192,9 @@ export default function ItinerariesPage() {
               coverImage: newBlogCover || selectedPlacesForBlog[0]?.image || '/logo-xoanen-cloudmood.png',
               postType: 'BLOG',
               status: 'PUBLISHED',
-              platformName: platformName.trim() || null,
-              platformLogo: platformLogo.trim() || null,
-              platformUrl: platformUrl.trim() || null,
+              platformName: editingBlogAuthor ? (editingBlogAuthor.fullName || null) : (platformName.trim() || null),
+              platformLogo: editingBlogAuthor ? (editingBlogAuthor.avatar || null) : (platformLogo.trim() || null),
+              platformUrl: editingBlogAuthor ? null : (platformUrl.trim() || null),
               items,
             }),
           });
@@ -1137,12 +1223,13 @@ export default function ItinerariesPage() {
         editingBlogId
           ? 'Đã cập nhật bài viết Blog thành công!'
           : selectedImportGuideId
-          ? 'Đã xuất Hướng dẫn du lịch thành bài viết Blog thành công!'
-          : 'Tạo bài Blog mới thành công!',
+            ? 'Đã xuất Hướng dẫn du lịch thành bài viết Blog thành công!'
+            : 'Tạo bài Blog mới thành công!',
         'success'
       );
       setIsCreateBlogOpen(false);
       setEditingBlogId(null);
+      setEditingBlogAuthor(null);
       setSelectedImportGuideId('');
       setNewBlogTitle('');
       setNewBlogDesc('');
@@ -1180,6 +1267,7 @@ export default function ItinerariesPage() {
   const [editingCat, setEditingCat] = useState<ChecklistCategory | null>(null);
   const [catName, setCatName] = useState('');
   const [catTabType, setCatTabType] = useState('GENERAL');
+  const [isTabTypeDropdownOpen, setIsTabTypeDropdownOpen] = useState(false);
   const [catLoading, setCatLoading] = useState(false);
 
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
@@ -1232,15 +1320,29 @@ export default function ItinerariesPage() {
     }
   };
 
-  const handleDeleteCategory = async (id: number | string) => {
-    if (!confirm('Bạn có chắc chắn muốn xóa danh mục này cùng toàn bộ vật dụng bên trong không?')) return;
+  const [isDeleteCatOpen, setIsDeleteCatOpen] = useState(false);
+  const [deletingCatId, setDeletingCatId] = useState<number | string | null>(null);
+  const [deleteCatLoading, setDeleteCatLoading] = useState(false);
+
+  const handleDeleteCategory = (id: number | string) => {
+    setDeletingCatId(id);
+    setIsDeleteCatOpen(true);
+  };
+
+  const executeDeleteCategory = async () => {
+    if (!deletingCatId) return;
+    setDeleteCatLoading(true);
     try {
-      const res = await fetch(`/api/admin/checklist-templates/categories/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/admin/checklist-templates/categories/${deletingCatId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Lỗi khi xóa danh mục.');
       showToast('Xóa danh mục thành công!', 'success');
+      setIsDeleteCatOpen(false);
+      setDeletingCatId(null);
       fetchChecklists();
     } catch (err: any) {
       showToast(err.message || 'Lỗi khi xóa.', 'error');
+    } finally {
+      setDeleteCatLoading(false);
     }
   };
 
@@ -1310,8 +1412,8 @@ export default function ItinerariesPage() {
         <button
           onClick={() => setMainTab('trips')}
           className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${mainTab === 'trips'
-              ? 'bg-blue-600 text-white shadow-md'
-              : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'
+            ? 'bg-blue-600 text-white shadow-md'
+            : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'
             }`}
         >
           Chuyến đi (Trips)
@@ -1320,8 +1422,8 @@ export default function ItinerariesPage() {
         <button
           onClick={() => setMainTab('guides')}
           className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${mainTab === 'guides'
-              ? 'bg-indigo-600 text-white shadow-md'
-              : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'
+            ? 'bg-indigo-600 text-white shadow-md'
+            : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'
             }`}
         >
           Hướng dẫn du lịch
@@ -1330,8 +1432,8 @@ export default function ItinerariesPage() {
         <button
           onClick={() => setMainTab('blogs')}
           className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${mainTab === 'blogs'
-              ? 'bg-purple-600 text-white shadow-md'
-              : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'
+            ? 'bg-purple-600 text-white shadow-md'
+            : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'
             }`}
         >
           Bài viết & Blog
@@ -1340,8 +1442,8 @@ export default function ItinerariesPage() {
         <button
           onClick={() => setMainTab('checklists')}
           className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${mainTab === 'checklists'
-              ? 'bg-emerald-600 text-white shadow-md'
-              : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'
+            ? 'bg-emerald-600 text-white shadow-md'
+            : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'
             }`}
         >
           Vật dụng cần thiết
@@ -1653,6 +1755,13 @@ export default function ItinerariesPage() {
                               <Eye size={14} />
                               Xem chi tiết
                             </button>
+                            <button
+                              onClick={(e) => handleOpenDeleteGuide(g.id, e)}
+                              className="p-1.5 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 rounded-lg transition-colors cursor-pointer"
+                              title="Xóa bài Hướng dẫn du lịch"
+                            >
+                              <Trash2 size={15} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1890,21 +1999,36 @@ export default function ItinerariesPage() {
               </div>
             ) : selectedTripDetail ? (
               <>
-                <div className="relative h-44 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 overflow-hidden shrink-0">
-                  {selectedTripDetail.coverImage && (
-                    <img src={selectedTripDetail.coverImage} alt="Cover" className="w-full h-full object-cover opacity-50" />
-                  )}
-                  <button
-                    onClick={() => setIsTripDetailOpen(false)}
-                    className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-black/70 text-white rounded-full transition-colors cursor-pointer z-10"
-                  >
-                    <X size={20} />
-                  </button>
-                  <div className="absolute bottom-4 left-6 right-6 flex justify-between items-end text-white">
+                {(() => {
+                  const coverUrl = selectedTripDetail.coverImage || selectedTripDetail.savedPlaces?.find((sp: any) => sp.place?.image)?.place?.image;
+                  return (
+                    <div className="relative h-48 bg-slate-900 overflow-hidden shrink-0 group">
+                      {coverUrl ? (
+                        <img src={coverUrl} alt="Cover" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900" />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-black/20" />
+                      {coverUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setFullCoverPreviewUrl(coverUrl)}
+                          className="absolute top-4 left-4 px-3 py-1.5 bg-black/60 hover:bg-black/80 text-white rounded-full text-xs font-extrabold flex items-center gap-1.5 backdrop-blur-md border border-white/20 transition-all cursor-pointer z-10 shadow-md hover:scale-105"
+                        >
+                          <Maximize2 size={13} /> Xem ảnh bìa
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setIsTripDetailOpen(false)}
+                        className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-black/70 text-white rounded-full transition-colors cursor-pointer z-10"
+                      >
+                        <X size={20} />
+                      </button>
+                      <div className="absolute bottom-4 left-6 right-6 flex justify-between items-end text-white z-10">
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-blue-600 text-white">
-                          {selectedTripDetail.isAi ? '⚡ AI tạo' : '✍️ Tự tạo'}
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-blue-600 text-white flex items-center gap-1 shadow-xs">
+                          {selectedTripDetail.isAi ? <><Zap size={12} className="text-amber-400 fill-amber-400" /> AI tạo</> : <><Edit2 size={12} /> Tự tạo</>}
                         </span>
                         {(() => {
                           const priv = getPrivacyBadgeInfo(null, selectedTripDetail);
@@ -1915,6 +2039,16 @@ export default function ItinerariesPage() {
                             </span>
                           );
                         })()}
+                        {selectedTripDetail.companion && (
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-purple-500/80 text-white backdrop-blur-xs border border-purple-300/30 flex items-center gap-1">
+                            <Users size={11} /> {selectedTripDetail.companion === 'Riêng tư' ? 'Đi một mình' : selectedTripDetail.companion}
+                          </span>
+                        )}
+                        {selectedTripDetail.pace && (
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-indigo-500/80 text-white backdrop-blur-xs border border-indigo-300/30 flex items-center gap-1">
+                            <Compass size={11} /> {selectedTripDetail.pace}
+                          </span>
+                        )}
                         <span className="text-xs text-blue-200 font-semibold flex items-center gap-1">
                           <MapPin size={12} /> {selectedTripDetail.destination}
                         </span>
@@ -1924,7 +2058,7 @@ export default function ItinerariesPage() {
                       </h2>
                     </div>
 
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <span className="text-xs text-slate-300 block">Dự toán chuyến đi</span>
                       <span className="text-lg font-black text-amber-400">
                         {selectedTripDetail.budget ? `${selectedTripDetail.budget.toLocaleString('vi-VN')} ${selectedTripDetail.currencySymbol || 'đ'}` : 'Tự do'}
@@ -1932,11 +2066,13 @@ export default function ItinerariesPage() {
                     </div>
                   </div>
                 </div>
+              );
+            })()}
 
                 {/* Sub Header info bar */}
-                <div className="px-6 py-3 bg-gray-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs">
+                <div className="px-6 py-3 bg-gray-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 overflow-hidden shrink-0 border border-blue-200">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950 overflow-hidden shrink-0 border border-blue-200 dark:border-blue-800">
                       <img src={selectedTripDetail.user?.avatar || '/default-avatar.svg'} alt="User" className="w-full h-full object-cover" />
                     </div>
                     <div>
@@ -1945,10 +2081,24 @@ export default function ItinerariesPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4 text-gray-600 dark:text-slate-300 font-medium">
-                    <span>🗓️ {selectedTripDetail.days ? `${selectedTripDetail.days} ngày` : 'Nhiều ngày'}</span>
-                    <span>👥 {selectedTripDetail.members?.length || 1} thành viên</span>
-                    <span>💰 Thực chi: <strong>{Math.round(selectedTripDetail.expenses?.reduce((a: any, b: any) => a + convertExpenseToItineraryCurrency(b, selectedTripDetail), 0) || 0).toLocaleString('vi-VN')} {selectedTripDetail.currencySymbol || 'đ'}</strong></span>
+                  <div className="flex flex-wrap items-center gap-3 text-gray-600 dark:text-slate-300 font-medium">
+                    <span className="flex items-center gap-1 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-800">
+                      <Calendar size={13} className="text-blue-500" /> {selectedTripDetail.days ? `${selectedTripDetail.days} ngày` : 'Nhiều ngày'}
+                    </span>
+
+                    {selectedTripDetail.startDate && (
+                      <span className="flex items-center gap-1 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-800">
+                        <Calendar size={13} className="text-emerald-500" /> Khởi hành: {new Date(selectedTripDetail.startDate).toLocaleDateString('vi-VN')}
+                      </span>
+                    )}
+
+                    <span className="flex items-center gap-1 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-800">
+                      <Users size={13} className="text-indigo-500" /> {selectedTripDetail.members?.length || 1} thành viên
+                    </span>
+
+                    <span className="flex items-center gap-1 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-800">
+                      <Wallet size={13} className="text-amber-500" /> Thực chi: <strong className="text-gray-900 dark:text-slate-100">{Math.round(selectedTripDetail.expenses?.reduce((a: any, b: any) => a + convertExpenseToItineraryCurrency(b, selectedTripDetail), 0) || 0).toLocaleString('vi-VN')} {selectedTripDetail.currencySymbol || 'đ'}</strong>
+                    </span>
                   </div>
                 </div>
 
@@ -1956,39 +2106,31 @@ export default function ItinerariesPage() {
                 <div className="flex border-b border-gray-200 dark:border-slate-800 px-6 bg-white dark:bg-slate-900 shrink-0">
                   <button
                     onClick={() => setTripDetailActiveTab('days')}
-                    className={`py-3.5 px-4 font-bold text-xs border-b-2 transition-all cursor-pointer ${tripDetailActiveTab === 'days'
-                        ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                        : 'border-transparent text-gray-500 hover:text-gray-800'
+                    className={`py-3.5 px-4 font-bold text-xs border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${tripDetailActiveTab === 'days'
+                      ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                      : 'border-transparent text-gray-500 hover:text-gray-800'
                       }`}
                   >
-                    🗓️ Lịch trình chi tiết ngày ({selectedTripDetail.details?.length || 0})
+                    <Calendar size={14} /> Lịch trình chi tiết ({selectedTripDetail.details?.length || 0})
                   </button>
-                  <button
-                    onClick={() => setTripDetailActiveTab('overview')}
-                    className={`py-3.5 px-4 font-bold text-xs border-b-2 transition-all cursor-pointer ${tripDetailActiveTab === 'overview'
-                        ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                        : 'border-transparent text-gray-500 hover:text-gray-800'
-                      }`}
-                  >
-                    📍 Địa điểm lưu tổng quan ({selectedTripDetail.savedPlaces?.length || 0})
-                  </button>
+
                   <button
                     onClick={() => setTripDetailActiveTab('expenses')}
-                    className={`py-3.5 px-4 font-bold text-xs border-b-2 transition-all cursor-pointer ${tripDetailActiveTab === 'expenses'
-                        ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                        : 'border-transparent text-gray-500 hover:text-gray-800'
+                    className={`py-3.5 px-4 font-bold text-xs border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${tripDetailActiveTab === 'expenses'
+                      ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                      : 'border-transparent text-gray-500 hover:text-gray-800'
                       }`}
                   >
-                    💰 Chi tiêu ({selectedTripDetail.expenses?.length || 0})
+                    <Receipt size={14} /> Chi tiêu ({selectedTripDetail.expenses?.length || 0})
                   </button>
                   <button
                     onClick={() => setTripDetailActiveTab('members')}
-                    className={`py-3.5 px-4 font-bold text-xs border-b-2 transition-all cursor-pointer ${tripDetailActiveTab === 'members'
-                        ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                        : 'border-transparent text-gray-500 hover:text-gray-800'
+                    className={`py-3.5 px-4 font-bold text-xs border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${tripDetailActiveTab === 'members'
+                      ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                      : 'border-transparent text-gray-500 hover:text-gray-800'
                       }`}
                   >
-                    👥 Thành viên & Lời mời ({selectedTripDetail.members?.length || 0})
+                    <Users size={14} /> Thành viên & Lời mời ({selectedTripDetail.members?.length || 0})
                   </button>
                 </div>
 
@@ -2086,85 +2228,7 @@ export default function ItinerariesPage() {
                     </div>
                   )}
 
-                  {/* TAB: LƯU TỔNG QUAN */}
-                  {tripDetailActiveTab === 'overview' && (
-                    <div className="space-y-4">
-                      {(() => {
-                        const grouped = groupSavedPlacesBySection(
-                          selectedTripDetail.sections,
-                          selectedTripDetail.savedPlaces
-                        );
 
-                        if (grouped.length === 0 || selectedTripDetail.savedPlaces?.length === 0) {
-                          return (
-                            <p className="text-gray-400 italic text-sm text-center py-6">
-                              Chưa có địa điểm lưu tổng quan.
-                            </p>
-                          );
-                        }
-
-                        return grouped.map(({ section, items }, idx) => {
-                          const isChecklist = section.sectionType === 'CHECKLIST';
-                          const sectionColor = parseSectionColor(section.colorCode);
-
-                          return (
-                            <div
-                              key={section.id || section.name || idx}
-                              className="border border-gray-200 dark:border-slate-800 rounded-2xl p-4 bg-gray-50/50 dark:bg-slate-950/40 space-y-3 shadow-2xs"
-                            >
-                              {/* Section Header (ItinerarySection) */}
-                              <div className="flex items-center justify-between border-b border-gray-200 dark:border-slate-800 pb-2.5">
-                                <div className="flex items-center gap-2.5">
-                                  <div
-                                    className="w-7 h-7 rounded-lg flex items-center justify-center font-bold shrink-0 text-white"
-                                    style={{
-                                      backgroundColor: sectionColor || (isChecklist ? '#d97706' : '#2563eb'),
-                                    }}
-                                  >
-                                    {isChecklist ? <CheckSquare size={15} /> : <Layers size={15} />}
-                                  </div>
-                                  <div>
-                                    <div className="flex items-center gap-2">
-                                      <h4
-                                        className="font-bold text-sm text-gray-900 dark:text-slate-100"
-                                        style={{ color: sectionColor || undefined }}
-                                      >
-                                        {section.name}
-                                      </h4>
-                                      {isChecklist && (
-                                        <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 rounded-md">
-                                          Checklist
-                                        </span>
-                                      )}
-                                    </div>
-                                    {section.subTitle && (
-                                      <p className="text-xs text-gray-500 dark:text-slate-400">
-                                        {section.subTitle}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                                <span className="text-xs font-bold text-gray-600 dark:text-slate-400 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 px-2.5 py-1 rounded-xl">
-                                  {items.length} địa điểm
-                                </span>
-                              </div>
-
-                              {/* Section Child Items (ItinerarySavedPlace) */}
-                              {items.length === 0 ? (
-                                <p className="text-xs text-gray-400 italic py-2">
-                                  Chưa có địa điểm hoặc ghi chú nào trong mục này.
-                                </p>
-                              ) : (
-                                <div className="space-y-2.5">
-                                  {items.map((sp: any, idx: number) => renderItineraryItemCard(sp, idx, sectionColor))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        });
-                      })()}
-                    </div>
-                  )}
 
                   {/* TAB: CHI TIÊU & QUYẾT TOÁN */}
                   {tripDetailActiveTab === 'expenses' && (
@@ -2253,7 +2317,7 @@ export default function ItinerariesPage() {
                                                 <span className="px-2 py-0.5 bg-gray-100 dark:bg-slate-800 rounded-md font-bold text-[11px] text-gray-700 dark:text-slate-300">
                                                   {e.category || 'Khác'}
                                                 </span>
-                                                {e.date && <span>• 🗓️ {e.date}</span>}
+                                                {e.date && <span className="flex items-center gap-1"><Calendar size={11} className="text-gray-400" /> {e.date}</span>}
                                               </div>
                                             </div>
                                           </div>
@@ -2265,12 +2329,14 @@ export default function ItinerariesPage() {
 
                                         {/* Detail attributes: Payer, Share, Linked Place */}
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-2 border-t border-gray-100 dark:border-slate-800 text-gray-600 dark:text-slate-300">
-                                          <div>
-                                            <span className="text-gray-400">👤 Người thanh toán: </span>
+                                          <div className="flex items-center gap-1">
+                                            <User size={13} className="text-gray-400" />
+                                            <span className="text-gray-400">Người thanh toán: </span>
                                             <strong className="text-gray-800 dark:text-slate-200">{e.payer || 'Không rõ'}</strong>
                                           </div>
-                                          <div>
-                                            <span className="text-gray-400">👥 Phân chia: </span>
+                                          <div className="flex items-center gap-1">
+                                            <Users size={13} className="text-gray-400" />
+                                            <span className="text-gray-400">Phân chia: </span>
                                             <strong className="text-gray-800 dark:text-slate-200">{e.share || 'Không chia'}</strong>
                                           </div>
                                           {linkedPlaceName && (
@@ -2283,13 +2349,13 @@ export default function ItinerariesPage() {
                                         {/* Linked Settlements */}
                                         {hasSettlements && (
                                           <div className="p-3 bg-purple-50/60 dark:bg-purple-950/20 rounded-xl border border-purple-100 dark:border-purple-900/30 text-xs space-y-1.5">
-                                            <span className="font-bold text-purple-700 dark:text-purple-300 block text-[11px] uppercase tracking-wider">
-                                              💸 Lịch sử quyết toán khoản này ({e.settlements.length}):
+                                            <span className="font-bold text-purple-700 dark:text-purple-300 flex items-center gap-1 text-[11px] uppercase tracking-wider">
+                                              <Receipt size={12} /> Lịch sử quyết toán khoản này ({e.settlements.length}):
                                             </span>
                                             {e.settlements.map((s: any) => (
                                               <div key={s.id} className="flex justify-between items-center text-purple-900 dark:text-purple-200 font-medium">
-                                                <span>
-                                                  👤 <strong>{s.fromName}</strong> ➔ <strong>{s.toName}</strong>
+                                                <span className="flex items-center gap-1">
+                                                  <User size={12} className="text-purple-400" /> <strong>{s.fromName}</strong> ➔ <strong>{s.toName}</strong>
                                                 </span>
                                                 <span className="font-extrabold text-purple-600 dark:text-purple-400">
                                                   {s.amount?.toLocaleString('vi-VN')} {currSym}
@@ -2309,7 +2375,7 @@ export default function ItinerariesPage() {
                             <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-slate-800">
                               <div className="flex items-center justify-between">
                                 <h4 className="text-xs font-extrabold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                                  <Receipt size={14} className="text-purple-500" /> Lịch sử quyết toán nhóm (ItinerarySettlement) ({settlementsList.length})
+                                  <Receipt size={14} className="text-purple-500" /> Lịch sử quyết toán nhóm ({settlementsList.length})
                                 </h4>
                               </div>
 
@@ -2331,8 +2397,8 @@ export default function ItinerariesPage() {
                                           <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">{s.toName}</span>
                                         </div>
                                         {s.date && (
-                                          <span className="text-[11px] text-gray-400 block">
-                                            ⏱️ {new Date(s.date).toLocaleDateString('vi-VN')} {new Date(s.date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                          <span className="text-[11px] text-gray-400 flex items-center gap-1">
+                                            <Clock size={11} /> {new Date(s.date).toLocaleDateString('vi-VN')} {new Date(s.date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                                           </span>
                                         )}
                                       </div>
@@ -2356,14 +2422,24 @@ export default function ItinerariesPage() {
                       <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Thành viên tham gia ({selectedTripDetail.members?.length || 0})</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {selectedTripDetail.members?.map((m: any) => (
-                          <div key={m.id} className="p-3.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-blue-100 overflow-hidden flex items-center justify-center shrink-0">
-                              <img src={m.user?.avatar || '/default-avatar.svg'} alt="Avatar" className="w-full h-full object-cover" />
+                          <div key={m.id} className="p-3.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-950 overflow-hidden flex items-center justify-center shrink-0 border border-blue-200 dark:border-blue-800">
+                                <img src={m.user?.avatar || '/default-avatar.svg'} alt="Avatar" className="w-full h-full object-cover" />
+                              </div>
+                              <div>
+                                <span className="font-bold text-xs text-gray-900 dark:text-slate-100 block">{m.user?.fullName}</span>
+                                <span className="text-[11px] text-gray-400 block">{m.user?.email}</span>
+                                {m.joinedAt && (
+                                  <span className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
+                                    <Clock size={10} /> Tham gia: {new Date(m.joinedAt).toLocaleDateString('vi-VN')}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <div>
-                              <span className="font-bold text-xs text-gray-900 dark:text-slate-100 block">{m.user?.fullName}</span>
-                              <span className="text-[11px] text-gray-400 block">{m.user?.email} • Vai trò: <strong className="text-blue-600">{m.role}</strong></span>
-                            </div>
+                            <span className="px-2.5 py-1 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 rounded-lg text-xs font-bold shrink-0">
+                              {m.role}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -2373,9 +2449,20 @@ export default function ItinerariesPage() {
                           <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-2">Lời mời cộng tác ({selectedTripDetail.invites.length})</h4>
                           <div className="space-y-2">
                             {selectedTripDetail.invites.map((inv: any) => (
-                              <div key={inv.id} className="p-3 rounded-xl border border-amber-200 bg-amber-50/40 text-xs flex justify-between items-center">
-                                <span>📧 Lời mời tới: <strong>{inv.email || 'Token Link'}</strong> (Vai trò: {inv.role})</span>
-                                <span className="font-bold text-amber-700">{inv.status}</span>
+                              <div key={inv.id} className="p-3 rounded-xl border border-amber-200 bg-amber-50/40 dark:bg-amber-950/20 text-xs flex justify-between items-center">
+                                <div>
+                                  <span className="font-bold text-gray-900 dark:text-slate-100 block">
+                                    Lời mời tới: {inv.email || 'Link liên kết'}
+                                  </span>
+                                  <span className="text-gray-500 text-[11px]">
+                                    Vai trò: <strong>{inv.role}</strong>
+                                    {inv.createdAt && ` • Gửi ngày ${new Date(inv.createdAt).toLocaleDateString('vi-VN')}`}
+                                    {inv.expiresAt && ` • Hết hạn ${new Date(inv.expiresAt).toLocaleDateString('vi-VN')}`}
+                                  </span>
+                                </div>
+                                <span className="px-2.5 py-1 bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-bold rounded-lg text-xs shrink-0">
+                                  {inv.status}
+                                </span>
                               </div>
                             ))}
                           </div>
@@ -2402,21 +2489,36 @@ export default function ItinerariesPage() {
             ) : selectedGuideDetail ? (
               <>
                 {/* Banner & Header */}
-                <div className="relative h-44 bg-gradient-to-r from-indigo-900 via-purple-900 to-slate-900 overflow-hidden shrink-0">
-                  {selectedGuideDetail.coverImage && (
-                    <img src={selectedGuideDetail.coverImage} alt="Cover" className="w-full h-full object-cover opacity-50" />
-                  )}
-                  <button
-                    onClick={() => setIsGuideDetailOpen(false)}
-                    className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-black/70 text-white rounded-full transition-colors cursor-pointer z-10"
-                  >
-                    <X size={20} />
-                  </button>
-                  <div className="absolute bottom-4 left-6 right-6 flex justify-between items-end text-white">
+                {(() => {
+                  const coverUrl = selectedGuideDetail.coverImage || selectedGuideDetail.savedPlaces?.find((sp: any) => sp.place?.image)?.place?.image;
+                  return (
+                    <div className="relative h-48 bg-slate-900 overflow-hidden shrink-0 group">
+                      {coverUrl ? (
+                        <img src={coverUrl} alt="Cover" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-r from-indigo-900 via-purple-900 to-slate-900" />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-black/20" />
+                      {coverUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setFullCoverPreviewUrl(coverUrl)}
+                          className="absolute top-4 left-4 px-3 py-1.5 bg-black/60 hover:bg-black/80 text-white rounded-full text-xs font-extrabold flex items-center gap-1.5 backdrop-blur-md border border-white/20 transition-all cursor-pointer z-10 shadow-md hover:scale-105"
+                        >
+                          <Maximize2 size={13} /> Xem ảnh bìa
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setIsGuideDetailOpen(false)}
+                        className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-black/70 text-white rounded-full transition-colors cursor-pointer z-10"
+                      >
+                        <X size={20} />
+                      </button>
+                      <div className="absolute bottom-4 left-6 right-6 flex justify-between items-end text-white z-10">
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-indigo-600 text-white">
-                          📖 Hướng dẫn du lịch
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-indigo-600 text-white flex items-center gap-1 shadow-xs">
+                          <BookOpen size={12} /> Hướng dẫn du lịch
                         </span>
                         {(() => {
                           const priv = getPrivacyBadgeInfo(null, selectedGuideDetail);
@@ -2427,6 +2529,16 @@ export default function ItinerariesPage() {
                             </span>
                           );
                         })()}
+                        {selectedGuideDetail.companion && (
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-purple-500/80 text-white backdrop-blur-xs border border-purple-300/30 flex items-center gap-1">
+                            <Users size={11} /> {selectedGuideDetail.companion === 'Riêng tư' ? 'Đi một mình' : selectedGuideDetail.companion}
+                          </span>
+                        )}
+                        {selectedGuideDetail.pace && (
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-indigo-500/80 text-white backdrop-blur-xs border border-indigo-300/30 flex items-center gap-1">
+                            <Compass size={11} /> {selectedGuideDetail.pace}
+                          </span>
+                        )}
                         <span className="text-xs text-indigo-200 font-semibold flex items-center gap-1">
                           <MapPin size={12} /> {selectedGuideDetail.destination}
                         </span>
@@ -2436,7 +2548,7 @@ export default function ItinerariesPage() {
                       </h2>
                     </div>
 
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <span className="text-xs text-slate-300 block">Địa điểm gợi ý</span>
                       <span className="text-lg font-black text-amber-400">
                         {selectedGuideDetail.savedPlaces?.length || 0} địa điểm
@@ -2444,6 +2556,8 @@ export default function ItinerariesPage() {
                     </div>
                   </div>
                 </div>
+              );
+            })()}
 
                 {/* Sub Header info bar */}
                 <div className="px-6 py-3 bg-gray-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs">
@@ -2457,9 +2571,24 @@ export default function ItinerariesPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4 text-gray-600 dark:text-slate-300 font-medium">
-                    <span>📍 {selectedGuideDetail.destination}</span>
-                    <span>📌 {selectedGuideDetail.savedPlaces?.length || 0} địa điểm gợi ý</span>
+                  <div className="flex items-center gap-3 text-gray-600 dark:text-slate-300 font-medium">
+                    <span className="flex items-center gap-1 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-800">
+                      <MapPin size={13} className="text-indigo-500" /> {selectedGuideDetail.destination}
+                    </span>
+                    <span className="flex items-center gap-1 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-800">
+                      <Layers size={13} className="text-purple-500" /> {selectedGuideDetail.savedPlaces?.length || 0} địa điểm gợi ý
+                    </span>
+                    <button
+                      onClick={() => {
+                        const guideId = selectedGuideDetail.id;
+                        setIsGuideDetailOpen(false);
+                        handleOpenDeleteGuide(guideId);
+                      }}
+                      className="px-3 py-1 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer border border-rose-200 dark:border-rose-900/50 ml-2"
+                    >
+                      <Trash2 size={13} />
+                      Xóa Hướng dẫn
+                    </button>
                   </div>
                 </div>
 
@@ -2468,18 +2597,18 @@ export default function ItinerariesPage() {
                   <button
                     onClick={() => setGuideDetailActiveTab('overview')}
                     className={`px-4 py-2.5 rounded-t-xl border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${guideDetailActiveTab === 'overview'
-                        ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900'
-                        : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-slate-200'
+                      ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900'
+                      : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-slate-200'
                       }`}
                   >
                     <Layers size={14} />
-                    Địa điểm lưu tổng quan ({selectedGuideDetail.savedPlaces?.length || 0})
+                    Danh sách địa điểm & Nội dung gợi ý ({selectedGuideDetail.savedPlaces?.length || 0})
                   </button>
                   <button
                     onClick={() => setGuideDetailActiveTab('members')}
                     className={`px-4 py-2.5 rounded-t-xl border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${guideDetailActiveTab === 'members'
-                        ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900'
-                        : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-slate-200'
+                      ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900'
+                      : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-slate-200'
                       }`}
                   >
                     <Users size={14} />
@@ -2521,8 +2650,8 @@ export default function ItinerariesPage() {
                                 <div className="flex items-center gap-2.5">
                                   <div
                                     className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold shrink-0 ${isChecklist
-                                        ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400'
-                                        : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400'
+                                      ? 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400'
+                                      : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400'
                                       }`}
                                   >
                                     {isChecklist ? <CheckSquare size={15} /> : <Layers size={15} />}
@@ -2624,41 +2753,52 @@ export default function ItinerariesPage() {
           <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl w-full max-w-3xl max-h-[88vh] shadow-2xl flex flex-col overflow-hidden relative">
 
             {/* Banner Header with Image or Gradient */}
-            <div className="relative h-44 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 overflow-hidden shrink-0">
-              {(selectedBlog.coverImage || selectedBlog.items?.find((i: any) => i.place?.image)?.place?.image) && (
-                <img
-                  src={selectedBlog.coverImage || selectedBlog.items?.find((i: any) => i.place?.image)?.place?.image}
-                  alt="Cover"
-                  className="w-full h-full object-cover opacity-40 mix-blend-overlay"
-                />
-              )}
-              <button
-                onClick={() => setIsBlogDetailOpen(false)}
-                className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-black/70 text-white rounded-full transition-colors cursor-pointer z-10"
-              >
-                <X size={20} />
-              </button>
-              <div className="absolute bottom-4 left-6 right-6 flex justify-between items-end text-white">
+            {(() => {
+              const coverUrl = selectedBlog.coverImage || selectedBlog.items?.find((i: any) => i.place?.image)?.place?.image;
+              return (
+                <div className="relative h-48 bg-slate-900 overflow-hidden shrink-0 group">
+                  {coverUrl ? (
+                    <img src={coverUrl} alt="Cover" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-black/20" />
+                  {coverUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setFullCoverPreviewUrl(coverUrl)}
+                      className="absolute top-4 left-4 px-3 py-1.5 bg-black/60 hover:bg-black/80 text-white rounded-full text-xs font-extrabold flex items-center gap-1.5 backdrop-blur-md border border-white/20 transition-all cursor-pointer z-10 shadow-md hover:scale-105"
+                    >
+                      <Maximize2 size={13} /> Xem ảnh bìa
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setIsBlogDetailOpen(false)}
+                    className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-black/70 text-white rounded-full transition-colors cursor-pointer z-10"
+                  >
+                    <X size={20} />
+                  </button>
+                  <div className="absolute bottom-4 left-6 right-6 flex justify-between items-end text-white z-10">
                 <div>
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                     <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-purple-600 text-white flex items-center gap-1 shadow-xs">
                       <BookOpen size={12} /> Bài viết Blog (ExplorePost)
                     </span>
                     {selectedBlog.originalItinerary ? (
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-indigo-500/80 text-white backdrop-blur-xs border border-indigo-300/30">
-                        📖 Từ Hướng dẫn (#{selectedBlog.originalItinerary.id})
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-indigo-500/80 text-white backdrop-blur-xs border border-indigo-300/30 flex items-center gap-1">
+                        <BookOpen size={11} /> Từ Hướng dẫn (#{selectedBlog.originalItinerary.id})
                       </span>
                     ) : (
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-500/80 text-white backdrop-blur-xs border border-emerald-300/30">
-                        ✍️ Blog trực tiếp
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-500/80 text-white backdrop-blur-xs border border-emerald-300/30 flex items-center gap-1">
+                        <Edit2 size={11} /> Blog trực tiếp
                       </span>
                     )}
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-slate-800/80 text-slate-200 border border-slate-700">
-                      {selectedBlog.status === 'PUBLISHED' || selectedBlog.status === 'Công khai' ? '🟢 Công khai' : '🟡 Nháp'}
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-slate-800/80 text-slate-200 border border-slate-700 flex items-center gap-1">
+                      {selectedBlog.status === 'PUBLISHED' || selectedBlog.status === 'Công khai' ? <><CheckCircle2 size={11} className="text-emerald-400" /> Công khai</> : <><Clock size={11} className="text-amber-400" /> Bản nháp</>}
                     </span>
                   </div>
                   <h2 className="text-2xl font-extrabold tracking-wide drop-shadow-md text-white">
-                    {selectedBlog.title}
+                    {stripLeadingEmoji(selectedBlog.title)}
                   </h2>
                 </div>
 
@@ -2672,6 +2812,8 @@ export default function ItinerariesPage() {
                 )}
               </div>
             </div>
+          );
+        })()}
 
             {/* Sub Header info bar */}
             <div className="px-6 py-3 bg-gray-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 text-xs">
@@ -2691,16 +2833,21 @@ export default function ItinerariesPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 text-gray-600 dark:text-slate-300 font-medium">
+              <div className="flex flex-wrap items-center gap-3 text-gray-600 dark:text-slate-300 font-medium">
                 <span className="flex items-center gap-1.5 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-800">
                   <Eye size={14} className="text-purple-500" /> {selectedBlog.viewCount || 0} lượt xem
                 </span>
                 <span className="flex items-center gap-1.5 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-800 text-rose-600 dark:text-rose-400 font-bold">
                   <Heart size={14} fill="currentColor" /> {selectedBlog._count?.likes || selectedBlog.likeCount || 0} lượt thích
                 </span>
-                <span className="flex items-center gap-1.5 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-800">
-                  <Layers size={14} className="text-indigo-500" /> {selectedBlog.items?.length || 0} mục nội dung
+                <span className="flex items-center gap-1.5 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-800 text-emerald-600 dark:text-emerald-400 font-bold">
+                  <Share2 size={14} /> {(selectedBlog as any).shareCount || 0} chia sẻ
                 </span>
+                {(selectedBlog as any).createdAt && (
+                  <span className="flex items-center gap-1.5 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-gray-200 dark:border-slate-800 text-gray-500">
+                    <Calendar size={14} className="text-blue-500" /> {new Date((selectedBlog as any).createdAt).toLocaleDateString('vi-VN')}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -2709,8 +2856,8 @@ export default function ItinerariesPage() {
               <button
                 onClick={() => setBlogDetailActiveTab('overview')}
                 className={`px-4 py-2.5 rounded-t-xl border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${blogDetailActiveTab === 'overview'
-                    ? 'border-purple-600 text-purple-600 dark:text-purple-400 bg-white dark:bg-slate-900'
-                    : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-slate-200'
+                  ? 'border-purple-600 text-purple-600 dark:text-purple-400 bg-white dark:bg-slate-900'
+                  : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-slate-200'
                   }`}
               >
                 <Layers size={14} />
@@ -2719,8 +2866,8 @@ export default function ItinerariesPage() {
               <button
                 onClick={() => setBlogDetailActiveTab('info')}
                 className={`px-4 py-2.5 rounded-t-xl border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${blogDetailActiveTab === 'info'
-                    ? 'border-purple-600 text-purple-600 dark:text-purple-400 bg-white dark:bg-slate-900'
-                    : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-slate-200'
+                  ? 'border-purple-600 text-purple-600 dark:text-purple-400 bg-white dark:bg-slate-900'
+                  : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-slate-200'
                   }`}
               >
                 <Users size={14} />
@@ -2732,10 +2879,12 @@ export default function ItinerariesPage() {
             <div className="p-6 overflow-y-auto space-y-4 flex-1 bg-white dark:bg-slate-900">
               {blogDetailActiveTab === 'overview' && (
                 <>
-                  {selectedBlog.description && (
+                  {selectedBlog.description && selectedBlog.description !== 'public' && selectedBlog.description !== 'draft' && selectedBlog.description.trim().length > 3 && (
                     <div className="p-4 rounded-2xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/30 text-xs text-gray-700 dark:text-slate-300 leading-relaxed italic relative">
-                      <span className="font-bold text-purple-700 dark:text-purple-400 non-italic block mb-1">💬 Mô tả bài viết:</span>
-                      "{selectedBlog.description}"
+                      <span className="font-bold text-purple-700 dark:text-purple-400 non-italic flex items-center gap-1.5 mb-1">
+                        <MessageSquare size={14} /> Mô tả bài viết:
+                      </span>
+                      "{stripLeadingEmoji(selectedBlog.description)}"
                     </div>
                   )}
 
@@ -2776,7 +2925,7 @@ export default function ItinerariesPage() {
                             <div className="w-7 h-7 rounded-lg bg-purple-100 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400 flex items-center justify-center font-bold shrink-0">
                               <Layers size={15} />
                             </div>
-                            <h4 className="font-bold text-sm text-gray-900 dark:text-slate-100">{sec.name}</h4>
+                            <h4 className="font-bold text-sm text-gray-900 dark:text-slate-100">{stripLeadingEmoji(sec.name)}</h4>
                           </div>
                           <span className="text-xs font-bold text-purple-600 dark:text-purple-400 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 px-2.5 py-1 rounded-xl">
                             {sec.items.length} mục
@@ -2832,39 +2981,72 @@ export default function ItinerariesPage() {
                             }
 
                             const place = item.place;
+                            const review = item.featuredReview;
+
                             return (
-                              <div key={item.id || iIdx} className="p-3.5 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-purple-300 transition-all flex items-start gap-3 text-xs shadow-2xs">
-                                {place?.image ? (
-                                  <img src={place.image} alt={place.name} className="w-16 h-16 rounded-xl object-cover shrink-0 border border-gray-200 dark:border-slate-800" />
-                                ) : (
-                                  <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 font-bold">
-                                    <MapPin size={20} />
-                                  </div>
-                                )}
-
-                                <div className="flex-1 min-w-0 space-y-1">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <h5 className="font-bold text-sm text-gray-900 dark:text-slate-100 truncate">
-                                      {place?.name || contentText || 'Địa điểm bài viết'}
-                                    </h5>
-                                    {place?.rating && (
-                                      <span className="flex items-center gap-1 font-bold text-amber-500 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-lg border border-amber-200/50 text-[11px] shrink-0">
-                                        <Star size={12} fill="currentColor" /> {place.rating}
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  {(place?.address || place?.description) && (
-                                    <p className="text-xs text-gray-500 dark:text-slate-400 line-clamp-1">
-                                      {formatAddress(place?.address) || place?.description}
-                                    </p>
+                              <div key={item.id || iIdx} className="p-3.5 rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-purple-300 transition-all text-xs shadow-2xs space-y-2.5">
+                                <div className="flex items-start gap-3">
+                                  {place?.image ? (
+                                    <img src={place.image} alt={place.name} className="w-16 h-16 rounded-xl object-cover shrink-0 border border-gray-200 dark:border-slate-800" />
+                                  ) : (
+                                    <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 font-bold">
+                                      <MapPin size={20} />
+                                    </div>
                                   )}
 
-                                  <div className="flex items-center gap-3 pt-0.5 text-[11px] text-gray-400">
-                                    {place?.phone && <span>📞 {place.phone}</span>}
-                                    {place?.website && <a href={place.website} target="_blank" rel="noreferrer" className="text-purple-600 hover:underline flex items-center gap-0.5">🌐 Website <ExternalLink size={10} /></a>}
+                                  <div className="flex-1 min-w-0 space-y-1">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <h5 className="font-bold text-sm text-gray-900 dark:text-slate-100 truncate">
+                                          {place?.name || contentText || 'Địa điểm bài viết'}
+                                        </h5>
+                                        {place?.category?.name && (
+                                          <span className="px-2 py-0.5 bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 font-bold text-[10px] rounded-md shrink-0 border border-purple-200/50">
+                                            {place.category.name}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {place?.rating && (
+                                        <span className="flex items-center gap-1 font-bold text-amber-500 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-lg border border-amber-200/50 text-[11px] shrink-0">
+                                          <Star size={12} fill="currentColor" /> {place.rating} {place.userRatingCount ? `(${place.userRatingCount})` : ''}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {(place?.address || place?.description) && (
+                                      <p className="text-xs text-gray-500 dark:text-slate-400 line-clamp-1">
+                                        {formatAddress(place?.address) || place?.description}
+                                      </p>
+                                    )}
+
+                                    <div className="flex items-center gap-3 pt-0.5 text-[11px] text-gray-400">
+                                      {place?.phone && <span className="flex items-center gap-1"><Phone size={11} /> {place.phone}</span>}
+                                      {place?.website && <a href={place.website} target="_blank" rel="noreferrer" className="text-purple-600 hover:underline flex items-center gap-0.5"><Globe size={11} /> Website <ExternalLink size={10} /></a>}
+                                    </div>
                                   </div>
                                 </div>
+
+                                {/* Render Featured Review Card if available */}
+                                {review && (
+                                  <div className="p-3 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/40 rounded-xl space-y-1 text-xs">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-5 h-5 rounded-full bg-amber-200 dark:bg-amber-900 overflow-hidden flex items-center justify-center font-bold text-[10px] text-amber-800 shrink-0">
+                                          {review.authorAvatar ? <img src={review.authorAvatar} alt="Avatar" className="w-full h-full object-cover" /> : (review.authorName || 'R')[0].toUpperCase()}
+                                        </div>
+                                        <span className="font-bold text-gray-900 dark:text-slate-100 text-[11px]">{review.authorName || 'Đánh giá từ du khách'}</span>
+                                      </div>
+                                      {review.rating && (
+                                        <span className="flex items-center gap-1 font-bold text-amber-500 text-[11px]">
+                                          <Star size={11} fill="currentColor" /> {review.rating}/5
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-gray-600 dark:text-slate-300 italic pl-7 text-[11px] leading-relaxed">
+                                      "{review.comment}"
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
@@ -2893,10 +3075,14 @@ export default function ItinerariesPage() {
                       </div>
                     </div>
 
-                    <div className="p-4 rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 space-y-1 text-xs">
-                      <span className="font-bold text-gray-900 dark:text-slate-100 block">Thống kê tương tác</span>
-                      <span className="text-gray-500 block">👁️ Lượt xem: <strong>{selectedBlog.viewCount || 0}</strong></span>
-                      <span className="text-gray-500 block">❤️ Lượt thích: <strong>{selectedBlog._count?.likes || selectedBlog.likeCount || 0}</strong></span>
+                    <div className="p-4 rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 space-y-1.5 text-xs">
+                      <span className="font-bold text-gray-900 dark:text-slate-100 block mb-1">Thống kê tương tác & Thời gian</span>
+                      <div className="grid grid-cols-2 gap-2 text-gray-600 dark:text-slate-300">
+                        <span className="flex items-center gap-1"><Eye size={13} className="text-purple-500" /> Xem: <strong>{selectedBlog.viewCount || 0}</strong></span>
+                        <span className="flex items-center gap-1"><Heart size={13} className="text-rose-500" /> Thích: <strong>{selectedBlog._count?.likes || selectedBlog.likeCount || 0}</strong></span>
+                        <span className="flex items-center gap-1"><Share2 size={13} className="text-emerald-500" /> Chia sẻ: <strong>{(selectedBlog as any).shareCount || 0}</strong></span>
+                        {(selectedBlog as any).createdAt && <span className="flex items-center gap-1"><Calendar size={13} className="text-blue-500" /> Ngày: <strong>{new Date((selectedBlog as any).createdAt).toLocaleDateString('vi-VN')}</strong></span>}
+                      </div>
                     </div>
                   </div>
 
@@ -2985,22 +3171,20 @@ export default function ItinerariesPage() {
               <button
                 type="button"
                 onClick={() => setModalBlogTab('info')}
-                className={`px-5 py-2.5 text-xs font-bold rounded-t-xl transition-all cursor-pointer flex items-center gap-1.5 ${
-                  modalBlogTab === 'info'
+                className={`px-5 py-2.5 text-xs font-bold rounded-t-xl transition-all cursor-pointer flex items-center gap-1.5 ${modalBlogTab === 'info'
                     ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-md'
                     : 'text-purple-200 hover:text-white hover:bg-white/10'
-                }`}
+                  }`}
               >
                 <FileText size={14} /> Thông tin bài viết
               </button>
               <button
                 type="button"
                 onClick={() => setModalBlogTab('places')}
-                className={`px-5 py-2.5 text-xs font-bold rounded-t-xl transition-all cursor-pointer flex items-center gap-1.5 ${
-                  modalBlogTab === 'places'
+                className={`px-5 py-2.5 text-xs font-bold rounded-t-xl transition-all cursor-pointer flex items-center gap-1.5 ${modalBlogTab === 'places'
                     ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-md'
                     : 'text-purple-200 hover:text-white hover:bg-white/10'
-                }`}
+                  }`}
               >
                 <MapPin size={14} /> Cấu trúc & Địa điểm
                 {selectedPlacesForBlog.length > 0 && (
@@ -3016,214 +3200,252 @@ export default function ItinerariesPage() {
 
               {/* TAB 1: Thông tin cơ bản */}
               {modalBlogTab === 'info' && (
-              <div className="p-6 overflow-y-auto flex-1">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
+                <div className="p-6 overflow-y-auto flex-1">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
 
-                  {/* LEFT: Form thông tin */}
-                  <div className="space-y-4">
-                    <h4 className="font-extrabold text-purple-700 dark:text-purple-400 uppercase tracking-wider text-[11px] flex items-center gap-1.5 border-b border-gray-100 dark:border-slate-800 pb-2">
-                      <FileText size={15} /> Thông tin cơ bản
-                    </h4>
+                    {/* LEFT: Form thông tin */}
+                    <div className="space-y-4">
+                      <h4 className="font-extrabold text-purple-700 dark:text-purple-400 uppercase tracking-wider text-[11px] flex items-center gap-1.5 border-b border-gray-100 dark:border-slate-800 pb-2">
+                        <FileText size={15} /> Thông tin cơ bản
+                      </h4>
 
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">
-                        Tiêu đề Blog *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Ví dụ: TOP 10 địa điểm không thể bỏ lỡ tại Cần Thơ..."
-                        value={newBlogTitle}
-                        onChange={(e) => setNewBlogTitle(e.target.value)}
-                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-sm font-semibold text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                      />
-                    </div>
-
-                    <DestinationSearchInput
-                      value={newBlogDest}
-                      onChange={setNewBlogDest}
-                      dbPlaces={allPlaces}
-                      placeholder="Nhập tên thành phố/tỉnh (VD: Cần Thơ, Đà Nẵng...)..."
-                    />
-
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">
-                        Mô tả Blog
-                      </label>
-                      <textarea
-                        rows={4}
-                        placeholder="Nhập nội dung mô tả bài viết Blog chi tiết..."
-                        value={newBlogDesc}
-                        onChange={(e) => setNewBlogDesc(e.target.value)}
-                        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none resize-y"
-                      />
-                    </div>
-
-                    {/* Platform / Source Section */}
-                    <div className="space-y-2 border-t border-gray-100 dark:border-slate-800 pt-3">
-                      <label className="block text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center justify-between">
-                        <span className="flex items-center gap-1.5">
-                          <Globe size={14} /> Nguồn bài viết (Source Platform)
-                        </span>
-                        <span className="text-[10px] text-gray-400 font-normal">Tự điền hoặc chọn mẫu có sẵn</span>
-                      </label>
-
-                      <div className="flex flex-nowrap gap-1.5 overflow-x-auto pb-0.5">
-                        {[
-                          { name: 'CloudMood', logo: '/favicon.ico' },
-                          { name: 'Google', logo: 'https://cdn-icons-png.flaticon.com/512/300/300221.png' },
-                          { name: 'Facebook', logo: 'https://cdn-icons-png.flaticon.com/512/5968/5968764.png' },
-                          { name: 'YouTube', logo: 'https://cdn-icons-png.flaticon.com/512/1384/1384060.png' },
-                          { name: 'TikTok', logo: 'https://cdn-icons-png.flaticon.com/512/3046/3046124.png' },
-                          { name: 'TripAdvisor', logo: 'https://cdn-icons-png.flaticon.com/512/2504/2504944.png' },
-                        ].map((p) => (
-                          <button
-                            key={p.name}
-                            type="button"
-                            onClick={() => {
-                              setPlatformName(p.name);
-                              setPlatformLogo(p.logo);
-                            }}
-                            className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
-                              platformName === p.name
-                                ? 'bg-purple-100 border-purple-500 text-purple-700 dark:bg-purple-950 dark:text-purple-300 shadow-2xs'
-                                : 'bg-gray-50 dark:bg-slate-950 border-gray-200 dark:border-slate-800 text-gray-600 dark:text-slate-400 hover:border-purple-300'
-                            }`}
-                          >
-                            <img src={p.logo} alt={p.name} className="w-3.5 h-3.5 object-contain" />
-                            {p.name}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pt-1">
-                        <div>
-                          <input
-                            type="text"
-                            placeholder="Tên Nguồn (VD: Facebook...)"
-                            value={platformName}
-                            onChange={(e) => setPlatformName(e.target.value)}
-                            className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                          />
-                        </div>
-                        <div className="relative flex items-center">
-                          <input
-                            type="text"
-                            placeholder="URL Avatar / Logo Nguồn..."
-                            value={platformLogo}
-                            onChange={(e) => setPlatformLogo(e.target.value)}
-                            className="w-full pl-3 pr-8 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                          />
-                          {platformLogo && (
-                            <img
-                              src={platformLogo}
-                              alt="Avatar Preview"
-                              className="absolute right-2 w-5 h-5 object-contain rounded-full border border-purple-200 bg-white p-0.5 shrink-0"
-                              onError={(e) => ((e.target as HTMLElement).style.display = 'none')}
-                            />
-                          )}
-                        </div>
-                        <div>
-                          <input
-                            type="text"
-                            placeholder="Link Nguồn (https://...)"
-                            value={platformUrl}
-                            onChange={(e) => setPlatformUrl(e.target.value)}
-                            className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* RIGHT: Ảnh bìa */}
-                  <div className="space-y-4">
-                    <h4 className="font-extrabold text-purple-700 dark:text-purple-400 uppercase tracking-wider text-[11px] flex items-center gap-1.5 border-b border-gray-100 dark:border-slate-800 pb-2">
-                      <ImageIcon size={15} /> Ảnh bìa bài viết
-                    </h4>
-
-                    <div className="p-4 rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/30 space-y-3">
-                      <div className="flex justify-between items-center">
-                        <label className="block text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center gap-1.5">
-                          <ImageIcon size={14} /> Cover Image
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">
+                          Tiêu đề Blog *
                         </label>
-                        <label className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-lg cursor-pointer flex items-center gap-1.5 transition-colors shadow-xs">
-                          {uploadingCover ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                          {uploadingCover ? 'Đang tải lên...' : 'Tải ảnh từ máy'}
-                          <input
-                            type="file"
-                            accept="image/*"
-                            disabled={uploadingCover}
-                            onChange={handleCoverFileUpload}
-                            className="hidden"
-                          />
-                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ví dụ: TOP 10 địa điểm không thể bỏ lỡ tại Cần Thơ..."
+                          value={newBlogTitle}
+                          onChange={(e) => setNewBlogTitle(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-sm font-semibold text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                        />
                       </div>
 
-                      <input
-                        type="text"
-                        placeholder="Hoặc dán URL ảnh bìa (https://...)..."
-                        value={newBlogCover}
-                        onChange={(e) => setNewBlogCover(e.target.value)}
-                        className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:outline-none"
+                      <DestinationSearchInput
+                        value={newBlogDest}
+                        onChange={setNewBlogDest}
+                        dbPlaces={allPlaces}
+                        placeholder="Nhập tên thành phố/tỉnh (VD: Cần Thơ, Đà Nẵng...)..."
                       />
 
-                      {newBlogCover ? (
-                        <div className="relative w-56 h-56 rounded-2xl overflow-hidden border-2 border-purple-300 dark:border-purple-800 group shadow-sm bg-slate-900 mx-auto">
-                          <img
-                            src={newBlogCover}
-                            alt="Cover Preview"
-                            className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105"
-                            onClick={() => setFullCoverPreviewUrl(newBlogCover)}
-                          />
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-4 pointer-events-none group-hover:pointer-events-auto">
-                            <button
-                              type="button"
-                              onClick={() => setFullCoverPreviewUrl(newBlogCover)}
-                              className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer shadow-md transition-all"
-                            >
-                              <Eye size={13} /> Xem full ảnh
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setNewBlogCover('')}
-                              className="w-full py-2 bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer shadow-md transition-all"
-                            >
-                              <X size={13} /> Xóa ảnh
-                            </button>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">
+                          Mô tả Blog
+                        </label>
+                        <textarea
+                          rows={4}
+                          placeholder="Nhập nội dung mô tả bài viết Blog chi tiết..."
+                          value={newBlogDesc}
+                          onChange={(e) => setNewBlogDesc(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none resize-y"
+                        />
+                      </div>
+
+                      {/* Platform / Source Section */}
+                      {editingBlogAuthor ? (
+                        <div className="space-y-2 border-t border-gray-100 dark:border-slate-800 pt-3">
+                          <label className="block text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              <User size={14} /> Tác giả bài viết (Người dùng)
+                            </span>
+                            <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">Giữ nguyên thông tin người dùng làm nguồn</span>
+                          </label>
+
+                          <div className="flex items-center gap-3 p-3 bg-purple-50/60 dark:bg-purple-950/30 border border-purple-100 dark:border-purple-900/40 rounded-xl">
+                            {editingBlogAuthor.avatar ? (
+                              <img
+                                src={editingBlogAuthor.avatar}
+                                alt={editingBlogAuthor.fullName}
+                                className="w-10 h-10 rounded-full object-cover border-2 border-purple-200 shadow-2xs shrink-0"
+                                onError={(e) => ((e.target as HTMLElement).style.display = 'none')}
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-purple-200 dark:bg-purple-900 flex items-center justify-center text-purple-700 dark:text-purple-300 font-bold text-sm border-2 border-purple-300 shrink-0">
+                                {editingBlogAuthor.fullName?.charAt(0).toUpperCase() || 'U'}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold text-gray-900 dark:text-slate-100 flex items-center gap-1.5">
+                                {editingBlogAuthor.fullName}
+                                {editingBlogAuthor.email && (
+                                  <span className="text-[10px] font-normal text-gray-400 dark:text-slate-500 truncate">
+                                    ({editingBlogAuthor.email})
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">
+                                Bài đăng của người dùng - Nguồn bài viết hiển thị tên và avatar của tác giả.
+                              </div>
+                            </div>
                           </div>
                         </div>
                       ) : (
-                        <div className="w-56 h-56 rounded-2xl border-2 border-dashed border-purple-200 dark:border-purple-800 flex flex-col items-center justify-center gap-2 text-purple-300 bg-purple-50/30 dark:bg-purple-950/10 mx-auto">
-                          <ImageIcon size={36} />
-                          <span className="text-[11px] font-medium text-gray-400">Chưa có ảnh bìa</span>
-                          <span className="text-[10px] text-gray-300">Tải lên hoặc dán URL ảnh bìa bên trên</span>
+                        <div className="space-y-2 border-t border-gray-100 dark:border-slate-800 pt-3">
+                          <label className="block text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              <Globe size={14} /> Nguồn bài viết (Source Platform)
+                            </span>
+                            <span className="text-[10px] text-gray-400 font-normal">Tự điền hoặc chọn mẫu có sẵn</span>
+                          </label>
+
+                          <div className="flex flex-nowrap gap-1.5 overflow-x-auto pb-0.5">
+                            {[
+                              { name: 'CloudMood', logo: '/favicon.ico' },
+                              { name: 'Google', logo: 'https://cdn-icons-png.flaticon.com/512/300/300221.png' },
+                              { name: 'Facebook', logo: 'https://cdn-icons-png.flaticon.com/512/5968/5968764.png' },
+                              { name: 'YouTube', logo: 'https://cdn-icons-png.flaticon.com/512/1384/1384060.png' },
+                              { name: 'TikTok', logo: 'https://cdn-icons-png.flaticon.com/512/3046/3046124.png' },
+                              { name: 'TripAdvisor', logo: 'https://cdn-icons-png.flaticon.com/512/2504/2504944.png' },
+                            ].map((p) => (
+                              <button
+                                key={p.name}
+                                type="button"
+                                onClick={() => {
+                                  setPlatformName(p.name);
+                                  setPlatformLogo(p.logo);
+                                }}
+                                className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${platformName === p.name
+                                    ? 'bg-purple-100 border-purple-500 text-purple-700 dark:bg-purple-950 dark:text-purple-300 shadow-2xs'
+                                    : 'bg-gray-50 dark:bg-slate-950 border-gray-200 dark:border-slate-800 text-gray-600 dark:text-slate-400 hover:border-purple-300'
+                                  }`}
+                              >
+                                <img src={p.logo} alt={p.name} className="w-3.5 h-3.5 object-contain" />
+                                {p.name}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pt-1">
+                            <div>
+                              <input
+                                type="text"
+                                placeholder="Tên Nguồn (VD: Facebook...)"
+                                value={platformName}
+                                onChange={(e) => setPlatformName(e.target.value)}
+                                className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                              />
+                            </div>
+                            <div className="relative flex items-center">
+                              <input
+                                type="text"
+                                placeholder="URL Avatar / Logo Nguồn..."
+                                value={platformLogo}
+                                onChange={(e) => setPlatformLogo(e.target.value)}
+                                className="w-full pl-3 pr-8 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                              />
+                              {platformLogo && (
+                                <img
+                                  src={platformLogo}
+                                  alt="Avatar Preview"
+                                  className="absolute right-2 w-5 h-5 object-contain rounded-full border border-purple-200 bg-white p-0.5 shrink-0"
+                                  onError={(e) => ((e.target as HTMLElement).style.display = 'none')}
+                                />
+                              )}
+                            </div>
+                            <div>
+                              <input
+                                type="text"
+                                placeholder="Link Nguồn (https://...)"
+                                value={platformUrl}
+                                onChange={(e) => setPlatformUrl(e.target.value)}
+                                className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                              />
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
-                  </div>
 
+                    {/* RIGHT: Ảnh bìa */}
+                    <div className="space-y-4">
+                      <h4 className="font-extrabold text-purple-700 dark:text-purple-400 uppercase tracking-wider text-[11px] flex items-center gap-1.5 border-b border-gray-100 dark:border-slate-800 pb-2">
+                        <ImageIcon size={15} /> Ảnh bìa bài viết
+                      </h4>
+
+                      <div className="p-4 rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/30 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <label className="block text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center gap-1.5">
+                            <ImageIcon size={14} /> Cover Image
+                          </label>
+                          <label className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-lg cursor-pointer flex items-center gap-1.5 transition-colors shadow-xs">
+                            {uploadingCover ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                            {uploadingCover ? 'Đang tải lên...' : 'Tải ảnh từ máy'}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              disabled={uploadingCover}
+                              onChange={handleCoverFileUpload}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+
+                        <input
+                          type="text"
+                          placeholder="Hoặc dán URL ảnh bìa (https://...)..."
+                          value={newBlogCover}
+                          onChange={(e) => setNewBlogCover(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:outline-none"
+                        />
+
+                        {newBlogCover ? (
+                          <div className="relative w-56 h-56 rounded-2xl overflow-hidden border-2 border-purple-300 dark:border-purple-800 group shadow-sm bg-slate-900 mx-auto">
+                            <img
+                              src={newBlogCover}
+                              alt="Cover Preview"
+                              className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105"
+                              onClick={() => setFullCoverPreviewUrl(newBlogCover)}
+                            />
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-4 pointer-events-none group-hover:pointer-events-auto">
+                              <button
+                                type="button"
+                                onClick={() => setFullCoverPreviewUrl(newBlogCover)}
+                                className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer shadow-md transition-all"
+                              >
+                                <Eye size={13} /> Xem full ảnh
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setNewBlogCover('')}
+                                className="w-full py-2 bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer shadow-md transition-all"
+                              >
+                                <X size={13} /> Xóa ảnh
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-56 h-56 rounded-2xl border-2 border-dashed border-purple-200 dark:border-purple-800 flex flex-col items-center justify-center gap-2 text-purple-300 bg-purple-50/30 dark:bg-purple-950/10 mx-auto">
+                            <ImageIcon size={36} />
+                            <span className="text-[11px] font-medium text-gray-400">Chưa có ảnh bìa</span>
+                            <span className="text-[10px] text-gray-300">Tải lên hoặc dán URL ảnh bìa bên trên</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
                 </div>
-              </div>
               )}
 
 
               {/* TAB 2: Địa điểm & Cấu trúc */}
               {modalBlogTab === 'places' && (
-              <div className="p-6 flex-1 min-h-0 overflow-hidden flex flex-col">
-                <AttachedPlacesManager
-                  selectedPlaces={selectedPlacesForBlog}
-                  onSelectedPlacesChange={setSelectedPlacesForBlog}
-                  allPlaces={allPlaces}
-                  onFetchPlaces={fetchPlaces}
-                  destination={newBlogDest}
-                  coverImage={newBlogCover}
-                  onCoverImageChange={(url) => {
-                    setNewBlogCover(url);
-                    showToast('Đã đặt ảnh địa điểm làm ảnh bìa bài Blog!', 'success');
-                  }}
-                />
-              </div>
+                <div className="p-6 flex-1 min-h-0 overflow-hidden flex flex-col">
+                  <AttachedPlacesManager
+                    selectedPlaces={selectedPlacesForBlog}
+                    onSelectedPlacesChange={setSelectedPlacesForBlog}
+                    allPlaces={allPlaces}
+                    onFetchPlaces={fetchPlaces}
+                    destination={newBlogDest}
+                    coverImage={newBlogCover}
+                    onCoverImageChange={(url) => {
+                      setNewBlogCover(url);
+                      showToast('Đã đặt ảnh địa điểm làm ảnh bìa bài Blog!', 'success');
+                    }}
+                  />
+                </div>
               )}
 
             </div>
@@ -3240,21 +3462,21 @@ export default function ItinerariesPage() {
                 </div>
               )}
               <div className="flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setIsCreateBlogOpen(false)}
-                className="px-5 py-2.5 border border-gray-200 dark:border-slate-800 font-bold rounded-xl text-xs text-gray-600 dark:text-slate-400 hover:bg-gray-100 transition-colors cursor-pointer"
-              >
-                Hủy
-              </button>
-              <button
-                type="submit"
-                disabled={createBlogLoading || uploadingCover}
-                className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-md cursor-pointer disabled:opacity-50"
-              >
-                {(createBlogLoading || uploadingCover) && <Loader2 size={15} className="animate-spin" />}
-                {editingBlogId ? '🚀 Cập nhật Bài Blog' : '🚀 Lưu Bài Blog'}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateBlogOpen(false)}
+                  className="px-5 py-2.5 border border-gray-200 dark:border-slate-800 font-bold rounded-xl text-xs text-gray-600 dark:text-slate-400 hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={createBlogLoading || uploadingCover}
+                  className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  {(createBlogLoading || uploadingCover) && <Loader2 size={15} className="animate-spin" />}
+                  {editingBlogId ? '🚀 Cập nhật Bài Blog' : '🚀 Lưu Bài Blog'}
+                </button>
               </div>
             </div>
           </form>
@@ -3306,18 +3528,202 @@ export default function ItinerariesPage() {
         </div>
       )}
 
+      {/* Delete Guide Confirmation Modal */}
+      {isDeleteGuideOpen && (
+        <div className="fixed inset-0 bg-black/55 backdrop-blur-xs flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl relative">
+            <button
+              onClick={() => setIsDeleteGuideOpen(false)}
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+            <div className="flex gap-4">
+              <div className="w-10 h-10 rounded-full bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-slate-100">
+                  Xác nhận xóa Hướng dẫn du lịch
+                </h3>
+                <p className="text-gray-500 dark:text-slate-400 text-xs mt-1">
+                  Bạn có chắc chắn muốn xóa bài Hướng dẫn du lịch này không? Thao tác này sẽ xóa vĩnh viễn dữ liệu trên hệ thống.
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsDeleteGuideOpen(false)}
+                className="px-4 py-2 border border-gray-200 dark:border-slate-800 rounded-xl text-xs font-bold text-gray-600 dark:text-slate-400 hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteGuide}
+                disabled={deleteGuideLoading}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {deleteGuideLoading && <Loader2 size={14} className="animate-spin" />}
+                Xóa vĩnh viễn
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Checklist Category Modal */}
       {isCatModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[9999] p-4">
-          <form onSubmit={handleSaveCategory} className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 p-6 rounded-3xl w-full max-w-md shadow-2xl space-y-3">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
+          <form onSubmit={handleSaveCategory} className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 p-6 rounded-3xl w-full max-w-md shadow-2xl space-y-4">
             <h3 className="text-lg font-bold text-gray-900 dark:text-slate-100">{editingCat ? 'Sửa danh mục' : 'Thêm danh mục mới'}</h3>
-            <input type="text" required placeholder="Tên danh mục..." value={catName} onChange={(e) => setCatName(e.target.value)} className="w-full p-2 border rounded-xl text-sm font-semibold" />
-            <input type="text" placeholder="Tab Type (GENERAL, CLOTHES...)" value={catTabType} onChange={(e) => setCatTabType(e.target.value)} className="w-full p-2 border rounded-xl text-sm" />
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setIsCatModalOpen(false)} className="px-4 py-2 border rounded-xl text-sm">Hủy</button>
-              <button type="submit" disabled={catLoading} className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl text-sm">Lưu Danh mục</button>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">Tên danh mục *</label>
+              <input
+                type="text"
+                required
+                placeholder="Tên danh mục..."
+                value={catName}
+                onChange={(e) => setCatName(e.target.value)}
+                className="w-full p-2.5 border rounded-xl text-sm font-semibold border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            <div className="relative">
+              <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">
+                Phân loại (Tab Type) *
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  placeholder="Chọn hoặc nhập Tab Type (VD: PACKING, TODO...)"
+                  value={catTabType}
+                  onFocus={() => setIsTabTypeDropdownOpen(true)}
+                  onChange={(e) => {
+                    setCatTabType(e.target.value.toUpperCase());
+                    setIsTabTypeDropdownOpen(true);
+                  }}
+                  className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-sm font-bold text-gray-900 dark:text-slate-100 pr-10 focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsTabTypeDropdownOpen(!isTabTypeDropdownOpen)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 transition-colors"
+                >
+                  <ChevronDown size={16} className={`transition-transform duration-200 ${isTabTypeDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+
+              {/* Custom Combobox Dropdown */}
+              {isTabTypeDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-[10000]"
+                    onClick={() => setIsTabTypeDropdownOpen(false)}
+                  />
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-xl z-[10001] max-h-48 overflow-y-auto p-1.5 space-y-0.5 animate-in fade-in zoom-in-95 duration-150">
+                    {Array.from(new Set([
+                      'GENERAL', 'PACKING', 'TODO', 'PREPARATION', 'MEDICAL', 'DOCUMENTS', 'FINANCE',
+                      ...checklists.map((c: any) => c.tabType?.toUpperCase()).filter(Boolean)
+                    ]))
+                      .filter((t) => !catTabType || t.includes(catTabType.toUpperCase()))
+                      .map((t) => (
+                        <div
+                          key={t}
+                          onClick={() => {
+                            setCatTabType(t);
+                            setIsTabTypeDropdownOpen(false);
+                          }}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors flex justify-between items-center ${catTabType.toUpperCase() === t
+                              ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-extrabold'
+                              : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'
+                            }`}
+                        >
+                          <span>{t}</span>
+                          {catTabType.toUpperCase() === t && <Check size={14} className="text-emerald-600" />}
+                        </div>
+                      ))}
+
+                    {catTabType && !Array.from(new Set([
+                      'GENERAL', 'PACKING', 'TODO', 'PREPARATION', 'MEDICAL', 'DOCUMENTS', 'FINANCE',
+                      ...checklists.map((c: any) => c.tabType?.toUpperCase()).filter(Boolean)
+                    ])).includes(catTabType.toUpperCase()) && (
+                        <div
+                          onClick={() => setIsTabTypeDropdownOpen(false)}
+                          className="px-3 py-2 rounded-xl text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/30 cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Plus size={13} /> Tạo phân loại mới: "<span className="font-extrabold">{catTabType}</span>"
+                        </div>
+                      )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsCatModalOpen(false)}
+                className="px-4 py-2 border rounded-xl text-sm font-bold text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                disabled={catLoading}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+              >
+                {catLoading ? 'Đang lưu...' : 'Lưu Danh mục'}
+              </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Delete Checklist Category Modal */}
+      {isDeleteCatOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 p-6 rounded-3xl w-full max-w-md shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-950/50 flex items-center justify-center shrink-0">
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900 dark:text-slate-100 text-base">Xác nhận xóa danh mục</h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400">Hành động này sẽ xóa danh mục và vật dụng bên trong</p>
+              </div>
+            </div>
+
+            <p className="text-xs font-medium text-gray-700 dark:text-slate-300 leading-relaxed bg-rose-50/60 dark:bg-rose-950/20 p-3 rounded-xl border border-rose-100 dark:border-rose-900/40">
+              Bạn có chắc chắn muốn xóa danh mục này cùng toàn bộ vật dụng bên trong không?
+            </p>
+
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDeleteCatOpen(false);
+                  setDeletingCatId(null);
+                }}
+                disabled={deleteCatLoading}
+                className="px-4 py-2 border border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-300 rounded-xl font-bold text-xs hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={executeDeleteCategory}
+                disabled={deleteCatLoading}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {deleteCatLoading && <Loader2 size={14} className="animate-spin" />}
+                Xác nhận xóa
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -3379,8 +3785,8 @@ export default function ItinerariesPage() {
                 {/* Header Bar */}
                 <div
                   className={`p-6 border-b flex items-start justify-between ${isTodoItem
-                      ? 'bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-900/40'
-                      : 'bg-amber-50/70 dark:bg-amber-950/40 border-amber-100 dark:border-amber-900/40'
+                    ? 'bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-900/40'
+                    : 'bg-amber-50/70 dark:bg-amber-950/40 border-amber-100 dark:border-amber-900/40'
                     }`}
                 >
                   <div className="flex items-start gap-3">
@@ -3393,8 +3799,8 @@ export default function ItinerariesPage() {
                     <div className="space-y-1">
                       <span
                         className={`text-[11px] font-extrabold uppercase px-2.5 py-0.5 rounded-lg inline-block ${isTodoItem
-                            ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300'
-                            : 'bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300'
+                          ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300'
+                          : 'bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300'
                           }`}
                       >
                         {isTodoItem ? '☑️ Danh sách công việc (Checklist)' : '📝 Ghi chú riêng (Note)'}
@@ -3450,8 +3856,8 @@ export default function ItinerariesPage() {
                           <div
                             key={tIdx}
                             className={`p-3 rounded-xl border flex items-start gap-2.5 text-xs transition-all ${todo.done
-                                ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40 text-emerald-900 dark:text-emerald-300'
-                                : 'bg-gray-50/50 dark:bg-slate-950 border-gray-200 dark:border-slate-800 text-gray-800 dark:text-slate-200'
+                              ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40 text-emerald-900 dark:text-emerald-300'
+                              : 'bg-gray-50/50 dark:bg-slate-950 border-gray-200 dark:border-slate-800 text-gray-800 dark:text-slate-200'
                               }`}
                           >
                             {todo.done ? (
@@ -3613,8 +4019,8 @@ export default function ItinerariesPage() {
                     {/* Giờ */}
                     <span
                       className={`inline-flex items-center gap-1.5 px-3 py-1 font-bold rounded-xl border transition-colors ${selectedPlaceItem.startTime || selectedPlaceItem.endTime
-                          ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-900/60 shadow-2xs'
-                          : 'bg-white dark:bg-slate-900 text-gray-400 dark:text-slate-500 border-gray-200 dark:border-slate-800'
+                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-900/60 shadow-2xs'
+                        : 'bg-white dark:bg-slate-900 text-gray-400 dark:text-slate-500 border-gray-200 dark:border-slate-800'
                         }`}
                     >
                       <Clock size={14} className={selectedPlaceItem.startTime || selectedPlaceItem.endTime ? 'text-blue-600' : 'opacity-40'} />

@@ -12,7 +12,8 @@ import {
   Layers,
   FolderPlus,
   Tag,
-  Briefcase
+  Briefcase,
+  ChevronDown
 } from 'lucide-react';
 
 interface ChecklistItem {
@@ -45,6 +46,7 @@ export default function ChecklistTemplatesPage() {
   const [editingCategory, setEditingCategory] = useState<ChecklistCategory | null>(null);
   const [categoryName, setCategoryName] = useState('');
   const [categoryTabType, setCategoryTabType] = useState('GENERAL');
+  const [isTabTypeDropdownOpen, setIsTabTypeDropdownOpen] = useState(false);
   const [categoryLoading, setCategoryLoading] = useState(false);
 
   // Modal Item
@@ -130,17 +132,29 @@ export default function ChecklistTemplatesPage() {
     }
   };
 
-  const handleDeleteCategory = async (id: number | string) => {
-    if (!confirm('Bạn có chắc chắn muốn xóa danh mục này cùng toàn bộ vật dụng bên trong không?')) return;
+  const [isDeleteCatOpen, setIsDeleteCatOpen] = useState(false);
+  const [deletingCatId, setDeletingCatId] = useState<number | string | null>(null);
+  const [deleteCatLoading, setDeleteCatLoading] = useState(false);
+
+  const handleDeleteCategory = (id: number | string) => {
+    setDeletingCatId(id);
+    setIsDeleteCatOpen(true);
+  };
+
+  const executeDeleteCategory = async () => {
+    if (!deletingCatId) return;
+    setDeleteCatLoading(true);
     try {
-      const res = await fetch(`/api/admin/checklist-templates/categories/${id}`, {
-        method: 'DELETE',
-      });
+      const res = await fetch(`/api/admin/checklist-templates/categories/${deletingCatId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Lỗi khi xóa danh mục.');
       showToast('Xóa danh mục thành công!', 'success');
+      setIsDeleteCatOpen(false);
+      setDeletingCatId(null);
       fetchTemplates();
     } catch (err: any) {
-      showToast(err.message || 'Lỗi khi xóa danh mục.', 'error');
+      showToast(err.message || 'Lỗi khi xóa.', 'error');
+    } finally {
+      setDeleteCatLoading(false);
     }
   };
 
@@ -359,15 +373,75 @@ export default function ChecklistTemplatesPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">Mã phân loại (tabType)</label>
-                <input
-                  type="text"
-                  placeholder="Ví dụ: DOCUMENTS, CLOTHES, ELECTRONICS..."
-                  value={categoryTabType}
-                  onChange={(e) => setCategoryTabType(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-sm text-gray-900 dark:text-slate-100"
-                />
+              <div className="relative">
+                <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">Mã phân loại (tabType) *</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Chọn hoặc nhập Tab Type (VD: PACKING, TODO...)"
+                    value={categoryTabType}
+                    onFocus={() => setIsTabTypeDropdownOpen(true)}
+                    onChange={(e) => {
+                      setCategoryTabType(e.target.value.toUpperCase());
+                      setIsTabTypeDropdownOpen(true);
+                    }}
+                    className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-sm font-bold text-gray-900 dark:text-slate-100 pr-10 focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsTabTypeDropdownOpen(!isTabTypeDropdownOpen)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 transition-colors"
+                  >
+                    <ChevronDown size={16} className={`transition-transform duration-200 ${isTabTypeDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                </div>
+
+                {/* Custom Combobox Dropdown */}
+                {isTabTypeDropdownOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-[10000]"
+                      onClick={() => setIsTabTypeDropdownOpen(false)}
+                    />
+                    <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-xl z-[10001] max-h-48 overflow-y-auto p-1.5 space-y-0.5 animate-in fade-in zoom-in-95 duration-150">
+                      {Array.from(new Set([
+                        'GENERAL', 'PACKING', 'TODO', 'PREPARATION', 'MEDICAL', 'DOCUMENTS', 'FINANCE',
+                        ...categories.map((c: any) => c.tabType?.toUpperCase()).filter(Boolean)
+                      ]))
+                      .filter((t) => !categoryTabType || t.includes(categoryTabType.toUpperCase()))
+                      .map((t) => (
+                        <div
+                          key={t}
+                          onClick={() => {
+                            setCategoryTabType(t);
+                            setIsTabTypeDropdownOpen(false);
+                          }}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors flex justify-between items-center ${
+                            categoryTabType.toUpperCase() === t
+                              ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-extrabold'
+                              : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          <span>{t}</span>
+                          {categoryTabType.toUpperCase() === t && <Check size={14} className="text-emerald-600" />}
+                        </div>
+                      ))}
+
+                      {categoryTabType && !Array.from(new Set([
+                        'GENERAL', 'PACKING', 'TODO', 'PREPARATION', 'MEDICAL', 'DOCUMENTS', 'FINANCE',
+                        ...categories.map((c: any) => c.tabType?.toUpperCase()).filter(Boolean)
+                      ])).includes(categoryTabType.toUpperCase()) && (
+                        <div
+                          onClick={() => setIsTabTypeDropdownOpen(false)}
+                          className="px-3 py-2 rounded-xl text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/30 cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Plus size={13} /> Tạo phân loại mới: "<span className="font-extrabold">{categoryTabType}</span>"
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -435,6 +509,49 @@ export default function ChecklistTemplatesPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+      {/* Delete Checklist Category Modal */}
+      {isDeleteCatOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 p-6 rounded-3xl w-full max-w-md shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-950/50 flex items-center justify-center shrink-0">
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900 dark:text-slate-100 text-base">Xác nhận xóa danh mục</h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400">Hành động này sẽ xóa danh mục và vật dụng bên trong</p>
+              </div>
+            </div>
+
+            <p className="text-xs font-medium text-gray-700 dark:text-slate-300 leading-relaxed bg-rose-50/60 dark:bg-rose-950/20 p-3 rounded-xl border border-rose-100 dark:border-rose-900/40">
+              Bạn có chắc chắn muốn xóa danh mục này cùng toàn bộ vật dụng bên trong không?
+            </p>
+
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDeleteCatOpen(false);
+                  setDeletingCatId(null);
+                }}
+                disabled={deleteCatLoading}
+                className="px-4 py-2 border border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-300 rounded-xl font-bold text-xs hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={executeDeleteCategory}
+                disabled={deleteCatLoading}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {deleteCatLoading && <Loader2 size={14} className="animate-spin" />}
+                Xác nhận xóa
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, startTransition } from 'react';
 import { UserRow } from '@/lib/supabase/types';
-import { Search, X, Loader2, Shield, Eye, EyeOff, Lock, Unlock, Calendar, Mail, Check, Plus, User } from 'lucide-react';
+import { Search, X, Loader2, Shield, Eye, EyeOff, Lock, Unlock, Calendar, Mail, Check, Plus, User, MessageSquare, Bot, Sparkles, Trash2, MapPin, Clock, RefreshCw } from 'lucide-react';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -47,6 +47,127 @@ export default function UsersPage() {
     setTimeout(() => {
       setToast(prev => ({ ...prev, show: false }));
     }, 4000);
+  };
+
+  // Chat History Modal State
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+  const [chatUser, setChatUser] = useState<UserRow | null>(null);
+  const [chatSessions, setChatSessions] = useState<any[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [sessionDetails, setSessionDetails] = useState<any | null>(null);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
+
+  const handleOpenChatHistory = (user: UserRow) => {
+    setChatUser(user);
+    setIsChatModalOpen(true);
+    setSelectedSessionId(null);
+    setSessionDetails(null);
+    fetchUserChatSessions(user.id);
+  };
+
+  const fetchUserChatSessions = async (userId: string | number) => {
+    setSessionsLoading(true);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/chat-sessions`);
+      if (!res.ok) throw new Error('Lỗi khi tải lịch sử chat.');
+      const data = await res.json();
+      setChatSessions(data || []);
+      if (Array.isArray(data) && data.length > 0) {
+        handleSelectChatSession(data[0].id);
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Không thể tải cuộc hội thoại.', 'error');
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  const handleSelectChatSession = async (sessionId: string) => {
+    setSelectedSessionId(sessionId);
+    setMessagesLoading(true);
+    try {
+      const res = await fetch(`/api/admin/chat-sessions/${sessionId}/messages`);
+      if (!res.ok) throw new Error('Lỗi khi tải tin nhắn hội thoại.');
+      const data = await res.json();
+      setSessionDetails(data);
+    } catch (err: any) {
+      showToast(err.message || 'Không thể tải tin nhắn hội thoại.', 'error');
+    } finally {
+      setMessagesLoading(false);
+    }
+  };
+
+  // Confirm Delete Modal State
+  const [confirmDeleteModal, setConfirmDeleteModal] = useState<{
+    show: boolean;
+    type: 'single' | 'all';
+    sessionId?: string;
+    title?: string;
+  }>({
+    show: false,
+    type: 'all',
+  });
+
+  const handleDeleteChatSession = (sessionId: string, title: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirmDeleteModal({
+      show: true,
+      type: 'single',
+      sessionId,
+      title: `Bạn có chắc chắn muốn xóa cuộc hội thoại "${title}" không?`,
+    });
+  };
+
+  const executeDeleteChatSession = async (sessionId: string) => {
+    setDeletingSessionId(sessionId);
+    try {
+      const res = await fetch(`/api/admin/chat-sessions/${sessionId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Lỗi khi xóa cuộc hội thoại.');
+      setChatSessions(prev => prev.filter(s => s.id !== sessionId));
+      if (selectedSessionId === sessionId) {
+        setSelectedSessionId(null);
+        setSessionDetails(null);
+      }
+      showToast('Đã xóa cuộc hội thoại thành công!', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi khi xóa cuộc hội thoại.', 'error');
+    } finally {
+      setDeletingSessionId(null);
+    }
+  };
+
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
+
+  const handleDeleteAllChatSessions = () => {
+    if (!chatUser) return;
+    setConfirmDeleteModal({
+      show: true,
+      type: 'all',
+      title: `Bạn có chắc chắn muốn XÓA TẤT CẢ ${chatSessions.length} cuộc hội thoại của người dùng "${chatUser.fullName || chatUser.email}" không? Hành động này sẽ xóa vĩnh viễn khỏi hệ thống backend.`,
+    });
+  };
+
+  const executeDeleteAllChatSessions = async () => {
+    if (!chatUser) return;
+    setIsDeletingAll(true);
+    try {
+      const res = await fetch(`/api/admin/users/${chatUser.id}/chat-sessions`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Lỗi khi xóa tất cả cuộc hội thoại.');
+      setChatSessions([]);
+      setSelectedSessionId(null);
+      setSessionDetails(null);
+      showToast('Đã xóa tất cả cuộc hội thoại thành công!', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi khi xóa tất cả cuộc hội thoại.', 'error');
+    } finally {
+      setIsDeletingAll(false);
+    }
   };
 
   useEffect(() => {
@@ -351,6 +472,13 @@ export default function UsersPage() {
                     </td>
                     <td className="px-4 py-3 text-right space-x-2">
                       <button
+                        onClick={() => handleOpenChatHistory(user)}
+                        className="p-2 text-purple-600 hover:text-purple-750 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
+                        title="Xem lịch sử Chat AI"
+                      >
+                        <MessageSquare size={16} />
+                      </button>
+                      <button
                         onClick={() => handleOpenView(user)}
                         className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer inline-flex items-center"
                         title="Xem chi tiết"
@@ -498,7 +626,17 @@ export default function UsersPage() {
               </div>
 
               {/* Modal controls */}
-              <div className="w-full pt-4 border-t border-gray-100 flex justify-end gap-3">
+              <div className="w-full pt-4 border-t border-gray-100 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsViewModalOpen(false);
+                    handleOpenChatHistory(selectedUser);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-xl font-bold text-sm transition-colors cursor-pointer"
+                >
+                  <MessageSquare size={14} /> Lịch sử Chat AI
+                </button>
                 <button
                   type="button"
                   onClick={() => handleToggleLock(selectedUser)}
@@ -656,6 +794,291 @@ export default function UsersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Chat History Modal */}
+      {isChatModalOpen && chatUser && (
+        <div className="fixed inset-0 bg-black/60 z-[2000] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-5xl w-full h-[85vh] shadow-2xl overflow-hidden border border-gray-200 flex flex-col animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-0.5 bg-gradient-to-tr from-purple-500 to-indigo-500 rounded-full shrink-0">
+                  <img
+                    src={getAvatarUrl(chatUser.avatar)}
+                    alt={chatUser.fullName || 'User'}
+                    className="w-10 h-10 rounded-full object-cover border-2 border-white"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-gray-900 text-base">
+                      {chatUser.fullName || 'Thành viên CloudMood'}
+                    </h3>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-purple-100 text-purple-700 border border-purple-200 flex items-center gap-1">
+                      <Sparkles size={11} /> Quản lý Chat AI
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500">{chatUser.email}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fetchUserChatSessions(chatUser.id)}
+                  disabled={sessionsLoading}
+                  className="p-2 text-gray-600 hover:text-purple-600 hover:bg-white rounded-xl transition-colors cursor-pointer border border-gray-200/60 bg-white/80 shadow-xs"
+                  title="Làm mới cuộc hội thoại"
+                >
+                  <RefreshCw size={16} className={sessionsLoading ? 'animate-spin' : ''} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsChatModalOpen(false)}
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-white rounded-xl transition-colors cursor-pointer border border-gray-200/60 bg-white/80 shadow-xs"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Content: 2 Columns */}
+            <div className="flex-1 flex min-h-0 overflow-hidden bg-gray-50/50">
+              {/* Left Column: Chat Sessions List */}
+              <div className="w-80 border-r border-gray-200 bg-white flex flex-col shrink-0">
+                <div className="p-3.5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+                  <span className="text-xs font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
+                    <MessageSquare size={13} /> Danh sách cuộc chat ({chatSessions.length})
+                  </span>
+                  {chatSessions.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleDeleteAllChatSessions}
+                      disabled={isDeletingAll}
+                      className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                      title="Xóa toàn bộ cuộc hội thoại của người dùng"
+                    >
+                      {isDeletingAll ? (
+                        <Loader2 size={12} className="animate-spin text-rose-600" />
+                      ) : (
+                        <Trash2 size={12} />
+                      )}
+                      {isDeletingAll ? 'Đang xóa...' : 'Xóa tất cả'}
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex-1 overflow-y-auto divide-y divide-gray-100 p-2 space-y-1">
+                  {sessionsLoading ? (
+                    <div className="py-12 text-center text-gray-400 flex flex-col items-center gap-2">
+                      <Loader2 size={24} className="animate-spin text-purple-600" />
+                      <span className="text-xs">Đang tải các đoạn chat...</span>
+                    </div>
+                  ) : chatSessions.length === 0 ? (
+                    <div className="py-12 text-center text-gray-400 space-y-2 p-4">
+                      <Bot size={32} className="mx-auto text-gray-300" />
+                      <p className="text-xs font-semibold text-gray-600">Chưa có cuộc trò chuyện AI nào</p>
+                      <p className="text-[11px] text-gray-400">Người dùng chưa tạo đoạn chat trợ lý AI.</p>
+                    </div>
+                  ) : (
+                    chatSessions.map((s) => {
+                      const isSelected = selectedSessionId === s.id;
+                      return (
+                        <div
+                          key={s.id}
+                          onClick={() => handleSelectChatSession(s.id)}
+                          className={`p-3 rounded-xl cursor-pointer transition-all border ${
+                            isSelected
+                              ? 'bg-purple-50/80 border-purple-300 shadow-2xs'
+                              : 'bg-white hover:bg-gray-50 border-transparent hover:border-gray-200'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start gap-2 mb-1">
+                            <h4 className={`text-xs font-bold truncate flex-1 ${isSelected ? 'text-purple-900' : 'text-gray-900'}`}>
+                              {s.title}
+                            </h4>
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteChatSession(s.id, s.title, e)}
+                              disabled={deletingSessionId === s.id}
+                              className="text-gray-300 hover:text-rose-600 p-1 rounded transition-colors cursor-pointer shrink-0"
+                              title="Xóa đoạn chat"
+                            >
+                              {deletingSessionId === s.id ? (
+                                <Loader2 size={13} className="animate-spin text-rose-500" />
+                              ) : (
+                                <Trash2 size={13} />
+                              )}
+                            </button>
+                          </div>
+
+                          {s.destination && (
+                            <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100 mb-1.5">
+                              <MapPin size={10} /> {s.destination}
+                            </div>
+                          )}
+
+                          {s.lastMessage && (
+                            <p className="text-[11px] text-gray-500 line-clamp-1 mb-2 italic">
+                              "{s.lastMessage}"
+                            </p>
+                          )}
+
+                          <div className="flex items-center justify-between text-[10px] text-gray-400 font-medium border-t border-gray-100/60 pt-1.5">
+                            <span className="flex items-center gap-1">
+                              <Clock size={10} /> {getFormattedDate(s.updatedAt || s.createdAt)}
+                            </span>
+                            <span className="px-1.5 py-0.2 bg-gray-100 rounded-full text-gray-600 font-bold">
+                              {s.messageCount} tin
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Chat Messages View */}
+              <div className="flex-1 flex flex-col min-w-0 bg-white">
+                {selectedSessionId && sessionDetails ? (
+                  <>
+                    {/* Session Header */}
+                    <div className="px-6 py-3.5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
+                      <div>
+                        <h4 className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                          <Bot size={16} className="text-purple-600" />
+                          {sessionDetails.title}
+                        </h4>
+                        <div className="flex items-center gap-3 text-[11px] text-gray-500 mt-0.5">
+                          {sessionDetails.destination && (
+                            <span className="flex items-center gap-1 text-indigo-600 font-semibold">
+                              <MapPin size={11} /> {sessionDetails.destination}
+                            </span>
+                          )}
+                          <span>Tạo ngày: {getFormattedDate(sessionDetails.createdAt)}</span>
+                          <span>({sessionDetails.messages?.length || 0} tin nhắn)</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Messages Body */}
+                    <div className="flex-1 p-6 overflow-y-auto space-y-4 bg-slate-50/50">
+                      {messagesLoading ? (
+                        <div className="py-20 text-center text-gray-400 flex flex-col items-center gap-2">
+                          <Loader2 size={28} className="animate-spin text-purple-600" />
+                          <span className="text-xs">Đang tải tin nhắn...</span>
+                        </div>
+                      ) : sessionDetails.messages?.length === 0 ? (
+                        <div className="py-20 text-center text-gray-400">
+                          Chưa có tin nhắn nào trong cuộc trò chuyện này.
+                        </div>
+                      ) : (
+                        sessionDetails.messages.map((m: any) => {
+                          const isUserRole = m.role === 'USER' || m.role === 'user';
+                          return (
+                            <div
+                              key={m.id}
+                              className={`flex gap-3 ${isUserRole ? 'justify-end' : 'justify-start'}`}
+                            >
+                              {!isUserRole && (
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shrink-0 shadow-xs mt-1">
+                                  <Sparkles size={14} />
+                                </div>
+                              )}
+
+                              <div className={`max-w-[75%] space-y-1 ${isUserRole ? 'items-end' : 'items-start'}`}>
+                                <div className={`flex items-center gap-2 text-[10px] font-bold text-gray-400 ${isUserRole ? 'justify-end' : 'justify-start'}`}>
+                                  <span>{isUserRole ? (chatUser.fullName || 'Người dùng') : 'Trợ lý CloudMood AI'}</span>
+                                  <span>•</span>
+                                  <span>{getFormattedDate(m.createdAt)}</span>
+                                </div>
+
+                                <div
+                                  className={`p-3.5 rounded-2xl text-xs whitespace-pre-wrap leading-relaxed shadow-xs ${
+                                    isUserRole
+                                      ? 'bg-blue-600 text-white rounded-tr-xs font-medium'
+                                      : 'bg-white border border-gray-200 text-gray-900 rounded-tl-xs'
+                                  }`}
+                                >
+                                  {m.content}
+                                </div>
+                              </div>
+
+                              {isUserRole && (
+                                <div className="w-8 h-8 rounded-full bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 shrink-0 shadow-xs mt-1 overflow-hidden">
+                                  <img
+                                    src={getAvatarUrl(chatUser.avatar)}
+                                    alt={chatUser.fullName || 'User'}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-8 space-y-3">
+                    <div className="w-16 h-16 rounded-full bg-purple-50 flex items-center justify-center text-purple-400">
+                      <MessageSquare size={32} />
+                    </div>
+                    <p className="text-sm font-bold text-gray-700">Chọn một cuộc trò chuyện ở cột bên trái</p>
+                    <p className="text-xs text-gray-400 max-w-sm text-center">
+                      Xem toàn bộ nội dung câu hỏi của người dùng và phản hồi của trợ lý AI.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Custom Confirm Delete Modal */}
+      {confirmDeleteModal.show && (
+        <div className="fixed inset-0 bg-black/60 z-[3000] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl p-6 border border-gray-200 space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900 text-base">Xác nhận xóa cuộc trò chuyện</h3>
+                <p className="text-xs text-gray-500">Hành động này sẽ xóa dữ liệu trên hệ thống</p>
+              </div>
+            </div>
+
+            <p className="text-xs font-medium text-gray-700 leading-relaxed bg-rose-50/60 p-3 rounded-xl border border-rose-100">
+              {confirmDeleteModal.title}
+            </p>
+
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteModal({ show: false, type: 'all' })}
+                className="px-4 py-2 border border-gray-300 text-gray-700 bg-white rounded-xl font-bold text-xs hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmDeleteModal({ show: false, type: 'all' });
+                  if (confirmDeleteModal.type === 'all') {
+                    executeDeleteAllChatSessions();
+                  } else if (confirmDeleteModal.sessionId) {
+                    executeDeleteChatSession(confirmDeleteModal.sessionId);
+                  }
+                }}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs transition-colors cursor-pointer shadow-sm"
+              >
+                Xác nhận xóa
+              </button>
+            </div>
           </div>
         </div>
       )}
