@@ -24,8 +24,12 @@ import {
   Upload,
   ArrowUp,
   ArrowDown,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Globe,
+  Edit2
 } from 'lucide-react';
+import DestinationSearchInput from '@/components/admin/DestinationSearchInput';
+import AttachedPlacesManager from '@/components/admin/AttachedPlacesManager';
 
 interface ExplorePost {
   id: number | string;
@@ -35,6 +39,9 @@ interface ExplorePost {
   postType: string;
   destination: string | null;
   status: string;
+  platformName?: string | null;
+  platformLogo?: string | null;
+  platformUrl?: string | null;
   viewCount: number;
   likeCount?: number;
   author?: {
@@ -80,7 +87,6 @@ export default function ExplorePostsPage() {
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [newDestination, setNewDestination] = useState('');
-  const [isDestDropdownOpen, setIsDestDropdownOpen] = useState(false);
   const [newCoverImage, setNewCoverImage] = useState('');
   const [newNote, setNewNote] = useState('');
   const [selectedPlaces, setSelectedPlaces] = useState<any[]>([]);
@@ -88,22 +94,83 @@ export default function ExplorePostsPage() {
   const [placeSearchQuery, setPlaceSearchQuery] = useState('');
   const [placesLoading, setPlacesLoading] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [fullCoverPreviewUrl, setFullCoverPreviewUrl] = useState<string | null>(null);
 
-  const POPULAR_DESTINATIONS = [
-    'Cần Thơ',
-    'Đà Nẵng',
-    'Hà Nội',
-    'TP. Hồ Chí Minh',
-    'Phú Quốc',
-    'Đà Lạt',
-    'Nha Trang',
-    'Hội An',
-    'Sapa',
-    'Huế',
-    'Quy Nhơn',
-    'Vũng Tàu',
-    'Phan Thiết',
-  ];
+  const [platformName, setPlatformName] = useState('CloudMood');
+  const [platformLogo, setPlatformLogo] = useState('/favicon.ico');
+  const [platformUrl, setPlatformUrl] = useState('');
+
+  const [editingBlogId, setEditingBlogId] = useState<number | string | null>(null);
+  const [modalTab, setModalTab] = useState<'info' | 'places'>('info');
+
+  const handleOpenCreateModal = () => {
+    setEditingBlogId(null);
+    setSelectedImportGuideId('');
+    setNewTitle('');
+    setNewDescription('');
+    setNewDestination('');
+    setNewCoverImage('');
+    setNewNote('');
+    setPlatformName('CloudMood');
+    setPlatformLogo('/favicon.ico');
+    setPlatformUrl('');
+    setSelectedPlaces([]);
+    setModalTab('info');
+    setIsCreateOpen(true);
+  };
+
+  const handleEditPostClick = (post: ExplorePost) => {
+    setEditingBlogId(post.id);
+    setSelectedImportGuideId('');
+    setNewTitle(post.title || '');
+    setNewDescription(post.description || '');
+    setNewDestination(post.destination || '');
+    setNewCoverImage(post.coverImage || '');
+    setPlatformName(post.platformName || 'CloudMood');
+    setPlatformLogo(post.platformLogo || '/favicon.ico');
+    setPlatformUrl(post.platformUrl || '');
+
+    const allItems = (post.items || []).map((i: any, index: number) => {
+      if (i.itemType === 'SECTION_HEADER') {
+        return {
+          id: `sec-${i.id || index}-${Date.now()}`,
+          itemType: 'SECTION_HEADER',
+          name: i.content || 'Phần nội dung',
+          customContent: i.content || '',
+        };
+      }
+      if (i.itemType === 'NOTE') {
+        return {
+          id: `note-${i.id || index}-${Date.now()}`,
+          itemType: 'NOTE',
+          name: 'Ghi chú',
+          customContent: i.content || '',
+          content: i.content || '',
+        };
+      }
+      if (i.itemType === 'CHECKLIST') {
+        return {
+          id: `chk-${i.id || index}-${Date.now()}`,
+          itemType: 'CHECKLIST',
+          name: 'Danh mục công việc',
+          customContent: i.content || '',
+          content: i.content || '',
+        };
+      }
+      return {
+        ...(i.place || {}),
+        id: i.place?.id || i.placeId || `place-${index}-${Date.now()}`,
+        placeId: i.place?.id || i.placeId,
+        itemType: 'PLACE',
+        name: i.place?.name || i.content || 'Địa điểm bài viết',
+        customContent: (i.content && i.content !== i.place?.description && i.content !== i.place?.name) ? i.content : '',
+      };
+    });
+
+    setSelectedPlaces(allItems);
+    setModalTab('info');
+    setIsCreateOpen(true);
+  };
 
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<number | string | null>(null);
@@ -269,43 +336,88 @@ export default function ExplorePostsPage() {
           });
         }
         selectedPlaces.forEach((p) => {
-          items.push({
-            itemType: 'PLACE',
-            placeId: p.id,
-            content: p.name,
-          });
+          if (p.itemType === 'SECTION_HEADER') {
+            items.push({
+              itemType: 'SECTION_HEADER',
+              content: (p.customContent && p.customContent.trim()) ? p.customContent.trim() : (p.name || 'Phần nội dung'),
+            });
+          } else if (p.itemType === 'NOTE') {
+            items.push({
+              itemType: 'NOTE',
+              content: (p.customContent && p.customContent.trim()) ? p.customContent.trim() : (p.content || ''),
+            });
+          } else if (p.itemType === 'CHECKLIST') {
+            items.push({
+              itemType: 'CHECKLIST',
+              content: p.customContent || p.content || '',
+            });
+          } else {
+            items.push({
+              itemType: 'PLACE',
+              placeId: p.placeId || p.id,
+              content: (p.customContent && p.customContent.trim()) ? p.customContent.trim() : (p.description || p.name || ''),
+            });
+          }
         });
 
-        res = await fetch('/api/admin/explore-posts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: newTitle,
-            description: newDescription,
-            destination: newDestination,
-            coverImage: newCoverImage || selectedPlaces[0]?.image || '/logo-xoanen-cloudmood.png',
-            postType: 'BLOG',
-            status: 'PUBLISHED',
-            items,
-          }),
-        });
+        if (editingBlogId) {
+          res = await fetch(`/api/admin/explore-posts/${editingBlogId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: newTitle,
+              description: newDescription,
+              destination: newDestination,
+              coverImage: newCoverImage || selectedPlaces[0]?.image || '/logo-xoanen-cloudmood.png',
+              postType: 'BLOG',
+              status: 'PUBLISHED',
+              platformName: platformName.trim() || null,
+              platformLogo: platformLogo.trim() || null,
+              platformUrl: platformUrl.trim() || null,
+              items,
+            }),
+          });
+        } else {
+          res = await fetch('/api/admin/explore-posts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: newTitle,
+              description: newDescription,
+              destination: newDestination,
+              coverImage: newCoverImage || selectedPlaces[0]?.image || '/logo-xoanen-cloudmood.png',
+              postType: 'BLOG',
+              status: 'PUBLISHED',
+              platformName: platformName.trim() || null,
+              platformLogo: platformLogo.trim() || null,
+              platformUrl: platformUrl.trim() || null,
+              items,
+            }),
+          });
+        }
       }
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || 'Lỗi khi tạo/xuất bài viết.');
       showToast(
-        selectedImportGuideId
+        editingBlogId
+          ? 'Đã cập nhật bài viết Blog thành công!'
+          : selectedImportGuideId
           ? 'Đã xuất bài Hướng dẫn thành bài viết Blog thành công!'
           : 'Tạo bài viết Blog mới thành công!',
         'success'
       );
       setIsCreateOpen(false);
+      setEditingBlogId(null);
       setSelectedImportGuideId('');
       setNewTitle('');
       setNewDescription('');
       setNewDestination('');
       setNewCoverImage('');
       setNewNote('');
+      setPlatformName('CloudMood');
+      setPlatformLogo('/favicon.ico');
+      setPlatformUrl('');
       setSelectedPlaces([]);
       setPlaceSearchQuery('');
       fetchPosts();
@@ -365,7 +477,7 @@ export default function ExplorePostsPage() {
         </div>
 
         <button
-          onClick={() => setIsCreateOpen(true)}
+          onClick={handleOpenCreateModal}
           className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm rounded-xl flex items-center gap-2 shadow-md cursor-pointer transition-all self-start sm:self-auto"
         >
           <Plus size={18} />
@@ -536,6 +648,13 @@ export default function ExplorePostsPage() {
                           title="Xem chi tiết Blog"
                         >
                           <Eye size={15} />
+                        </button>
+                        <button
+                          onClick={() => handleEditPostClick(post)}
+                          className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg transition-colors cursor-pointer"
+                          title="Chỉnh sửa bài viết"
+                        >
+                          <Edit2 size={15} />
                         </button>
                         <button
                           onClick={() => {
@@ -813,41 +932,91 @@ export default function ExplorePostsPage() {
                 </>
               )}
 
-              {activeDetailTab === 'info' && (
-                <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Thông tin Tác giả & Bài viết</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="p-4 rounded-2xl border border-purple-200 dark:border-purple-900/40 bg-purple-50/40 dark:bg-purple-950/20 flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-950 overflow-hidden flex items-center justify-center shrink-0 border border-purple-300 font-bold text-sm text-purple-600 dark:text-purple-300">
-                        {selectedPost.author?.avatar ? (
-                          <img src={selectedPost.author.avatar} alt="Avatar" className="w-full h-full object-cover" />
-                        ) : (
-                          (selectedPost.author?.fullName || 'A')[0].toUpperCase()
-                        )}
+              {activeDetailTab === 'info' && (() => {
+                const isExternalSource = selectedPost.platformName && selectedPost.platformName !== 'CloudMood';
+
+                return (
+                  <div className="space-y-4">
+                    {/* Header title */}
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                      {isExternalSource ? 'Nguồn & Bài viết gốc' : 'Thông tin Tác giả & Bài viết'}
+                    </h4>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {/* Author Card */}
+                      <div className="p-4 rounded-2xl border border-purple-200 dark:border-purple-900/40 bg-purple-50/40 dark:bg-purple-950/20 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-950 overflow-hidden flex items-center justify-center shrink-0 border border-purple-300 font-bold text-sm text-purple-600 dark:text-purple-300">
+                          {selectedPost.author?.avatar ? (
+                            <img src={selectedPost.author.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                          ) : (
+                            (selectedPost.author?.fullName || 'A')[0].toUpperCase()
+                          )}
+                        </div>
+                        <div>
+                          <span className="font-bold text-xs text-gray-900 dark:text-slate-100 block">
+                            {selectedPost.author?.fullName || 'Biên tập viên Admin'}
+                          </span>
+                          <span className="text-[11px] text-purple-600 dark:text-purple-400 block font-semibold">
+                            {selectedPost.author?.email || 'admin@cloudmood.com'} • Biên tập viên
+                          </span>
+                        </div>
                       </div>
-                      <div>
-                        <span className="font-bold text-xs text-gray-900 dark:text-slate-100 block">{selectedPost.author?.fullName || 'Biên tập viên Admin'}</span>
-                        <span className="text-[11px] text-purple-600 dark:text-purple-400 block font-semibold">{selectedPost.author?.email || 'admin@cloudmood.com'} • Biên tập viên</span>
+
+                      {/* Interaction Stats */}
+                      <div className="p-4 rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 space-y-1 text-xs">
+                        <span className="font-bold text-gray-900 dark:text-slate-100 block">Thống kê tương tác</span>
+                        <span className="text-gray-500 block">👁️ Lượt xem: <strong>{selectedPost.viewCount || 0}</strong></span>
+                        <span className="text-gray-500 block">❤️ Lượt thích: <strong>{selectedPost._count?.likes || selectedPost.likeCount || 0}</strong></span>
                       </div>
                     </div>
 
-                    <div className="p-4 rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 space-y-1 text-xs">
-                      <span className="font-bold text-gray-900 dark:text-slate-100 block">Thống kê tương tác</span>
-                      <span className="text-gray-500 block">👁️ Lượt xem: <strong>{selectedPost.viewCount || 0}</strong></span>
-                      <span className="text-gray-500 block">❤️ Lượt thích: <strong>{selectedPost._count?.likes || selectedPost.likeCount || 0}</strong></span>
-                    </div>
+                    {/* External Source Card */}
+                    {(selectedPost.platformName || selectedPost.platformUrl) && (
+                      <div className="p-4 rounded-2xl border border-purple-200 dark:border-purple-900/40 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/30 dark:to-indigo-950/30 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {selectedPost.platformLogo ? (
+                              <img src={selectedPost.platformLogo} alt="Platform Logo" className="w-6 h-6 object-contain rounded-full border border-purple-200 bg-white p-0.5 shrink-0" />
+                            ) : (
+                              <Globe size={18} className="text-purple-600 shrink-0" />
+                            )}
+                            <div className="min-w-0">
+                              <span className="text-xs font-bold text-gray-900 dark:text-slate-100 block">
+                                Nguồn bài viết: {selectedPost.platformName || 'Bên ngoài'}
+                              </span>
+                              {selectedPost.platformUrl && (
+                                <span className="text-[11px] text-purple-600 dark:text-purple-400 truncate block">
+                                  {selectedPost.platformUrl}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {selectedPost.platformUrl && (
+                            <a
+                              href={selectedPost.platformUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer shrink-0"
+                            >
+                              <ExternalLink size={13} /> Xem bài viết gốc
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedPost.originalItinerary && (
+                      <div className="p-4 rounded-2xl border border-indigo-200 bg-indigo-50/50 text-xs flex justify-between items-center">
+                        <div>
+                          <span className="font-bold text-indigo-900 block">📖 Xuất từ bài Hướng dẫn du lịch:</span>
+                          <span className="text-indigo-700 font-semibold">{selectedPost.originalItinerary.title} (#{selectedPost.originalItinerary.id})</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
-
-                  {selectedPost.originalItinerary && (
-                    <div className="p-4 rounded-2xl border border-indigo-200 bg-indigo-50/50 text-xs flex justify-between items-center">
-                      <div>
-                        <span className="font-bold text-indigo-900 block">📖 Xuất từ bài Hướng dẫn du lịch:</span>
-                        <span className="text-indigo-700 font-semibold">{selectedPost.originalItinerary.title} (#{selectedPost.originalItinerary.id})</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+                );
+              })()}
             </div>
 
             {/* Footer */}
@@ -866,7 +1035,7 @@ export default function ExplorePostsPage() {
       {/* Upgraded Create Blog Modal */}
       {isCreateOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[9999] p-4 animate-in fade-in duration-200">
-          <form onSubmit={handleCreateBlog} className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl w-full max-w-5xl max-h-[92vh] shadow-2xl flex flex-col overflow-hidden relative">
+          <form onSubmit={handleCreateBlog} className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl w-full max-w-7xl max-h-[92vh] shadow-2xl flex flex-col overflow-hidden relative">
 
             {/* Modal Header */}
             <div className="px-6 py-4.5 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white flex justify-between items-center shrink-0">
@@ -874,7 +1043,7 @@ export default function ExplorePostsPage() {
                 <span className="text-[11px] font-black uppercase tracking-wider text-purple-300 block mb-0.5">Biên tập nội dung</span>
                 <h3 className="text-xl font-black tracking-wide flex items-center gap-2">
                   <Sparkles className="text-purple-400" size={22} />
-                  Tạo Bài đăng Blog mới
+                  {editingBlogId ? 'Chỉnh sửa Bài đăng Blog' : 'Tạo Bài đăng Blog mới'}
                 </h3>
               </div>
               <button
@@ -886,15 +1055,46 @@ export default function ExplorePostsPage() {
               </button>
             </div>
 
-            {/* Modal Body - 2 Column Layout */}
-            <div className="p-6 overflow-y-auto flex-1 text-xs">
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Tab Navigation */}
+            <div className="px-6 pt-2 pb-0 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 flex gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => setModalTab('info')}
+                className={`px-5 py-2.5 text-xs font-bold rounded-t-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                  modalTab === 'info'
+                    ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-md'
+                    : 'text-purple-200 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <FileText size={14} /> Thông tin bài viết
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalTab('places')}
+                className={`px-5 py-2.5 text-xs font-bold rounded-t-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                  modalTab === 'places'
+                    ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-md'
+                    : 'text-purple-200 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <MapPin size={14} /> Cấu trúc & Địa điểm
+                {selectedPlaces.length > 0 && (
+                  <span className="bg-purple-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                    {selectedPlaces.filter((p: any) => !p.itemType || p.itemType === 'PLACE').length}
+                  </span>
+                )}
+              </button>
+            </div>
 
-                {/* Left Column (col-span-6): Basic Info & Cover Image */}
-                <div className="lg:col-span-6 space-y-4">
-                  <h4 className="font-extrabold text-purple-700 dark:text-purple-400 uppercase tracking-wider text-[11px] flex items-center gap-1.5 border-b border-gray-100 dark:border-slate-800 pb-2">
-                    <FileText size={15} /> 1. Thông tin cơ bản bài viết
-                  </h4>
+            {/* Modal Body - Tab Content */}
+            <div className="overflow-y-auto flex-1 text-xs">
+
+              {/* TAB 1: Thông tin cơ bản */}
+              {modalTab === 'info' && (
+              <div className="p-6 space-y-4">
+                <h4 className="font-extrabold text-purple-700 dark:text-purple-400 uppercase tracking-wider text-[11px] flex items-center gap-1.5 border-b border-gray-100 dark:border-slate-800 pb-2">
+                  <FileText size={15} /> 1. Thông tin cơ bản bài viết
+                </h4>
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">
@@ -910,47 +1110,12 @@ export default function ExplorePostsPage() {
                     />
                   </div>
 
-                  <div className="relative">
-                    <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">
-                      Điểm đến
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Nhập tên thành phố/tỉnh (VD: Cần Thơ, Đà Nẵng...)..."
-                      value={newDestination}
-                      onFocus={() => setIsDestDropdownOpen(true)}
-                      onChange={(e) => {
-                        setNewDestination(e.target.value);
-                        setIsDestDropdownOpen(true);
-                      }}
-                      className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                    />
-
-                    {/* Popular Destinations Chip Pills */}
-                    {isDestDropdownOpen && (
-                      <div className="mt-2 p-2.5 bg-white dark:bg-slate-950 border border-purple-200 dark:border-purple-900/60 rounded-xl shadow-lg space-y-1.5 z-20">
-                        <span className="text-[10px] font-bold text-gray-400 block uppercase">Gợi ý địa điểm phổ biến:</span>
-                        <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
-                          {POPULAR_DESTINATIONS.filter(d => d.toLowerCase().includes(newDestination.toLowerCase())).map((d) => (
-                            <button
-                              key={d}
-                              type="button"
-                              onClick={() => {
-                                setNewDestination(d);
-                                setIsDestDropdownOpen(false);
-                              }}
-                              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${newDestination === d
-                                ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
-                                : 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800'
-                                }`}
-                            >
-                              📍 {d}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <DestinationSearchInput
+                    value={newDestination}
+                    onChange={setNewDestination}
+                    dbPlaces={allPlaces}
+                    placeholder="Nhập tên thành phố/tỉnh (VD: Cần Thơ, Đà Nẵng...)..."
+                  />
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">
@@ -963,6 +1128,84 @@ export default function ExplorePostsPage() {
                       onChange={(e) => setNewDescription(e.target.value)}
                       className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none resize-y"
                     />
+                  </div>
+
+                  {/* Platform / Source Section */}
+                  <div className="space-y-2 border-t border-gray-100 dark:border-slate-800 pt-3">
+                    <label className="block text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Globe size={14} /> Nguồn bài viết (Source Platform)
+                      </span>
+                      <span className="text-[10px] text-gray-400 font-normal">Tự điền hoặc chọn mẫu có sẵn</span>
+                    </label>
+
+                    {/* Presets */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { name: 'CloudMood', logo: '/favicon.ico' },
+                        { name: 'Google', logo: 'https://cdn-icons-png.flaticon.com/512/300/300221.png' },
+                        { name: 'Facebook', logo: 'https://cdn-icons-png.flaticon.com/512/5968/5968764.png' },
+                        { name: 'YouTube', logo: 'https://cdn-icons-png.flaticon.com/512/1384/1384060.png' },
+                        { name: 'TikTok', logo: 'https://cdn-icons-png.flaticon.com/512/3046/3046124.png' },
+                        { name: 'TripAdvisor', logo: 'https://cdn-icons-png.flaticon.com/512/2504/2504944.png' },
+                      ].map((p) => (
+                        <button
+                          key={p.name}
+                          type="button"
+                          onClick={() => {
+                            setPlatformName(p.name);
+                            setPlatformLogo(p.logo);
+                          }}
+                          className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
+                            platformName === p.name
+                              ? 'bg-purple-100 border-purple-500 text-purple-700 dark:bg-purple-950 dark:text-purple-300 shadow-2xs'
+                              : 'bg-gray-50 dark:bg-slate-950 border-gray-200 dark:border-slate-800 text-gray-600 dark:text-slate-400 hover:border-purple-300'
+                          }`}
+                        >
+                          <img src={p.logo} alt={p.name} className="w-3.5 h-3.5 object-contain" />
+                          {p.name}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* 3 Explicit Inputs: Tên Nguồn, Avatar URL, Link URL */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pt-1">
+                      <div>
+                        <input
+                          type="text"
+                          placeholder="Tên Nguồn (VD: Facebook...)"
+                          value={platformName}
+                          onChange={(e) => setPlatformName(e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                        />
+                      </div>
+                      <div className="relative flex items-center">
+                        <input
+                          type="text"
+                          placeholder="URL Avatar / Logo Nguồn..."
+                          value={platformLogo}
+                          onChange={(e) => setPlatformLogo(e.target.value)}
+                          className="w-full pl-3 pr-8 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                        />
+                        {platformLogo && (
+                          <img
+                            src={platformLogo}
+                            alt="Avatar Preview"
+                            className="absolute right-2 w-5 h-5 object-contain rounded-full border border-purple-200 bg-white p-0.5 shrink-0"
+                            onError={(e) => ((e.target as HTMLElement).style.display = 'none')}
+                          />
+                        )}
+                      </div>
+                      <div>
+                        <input
+                          type="text"
+                          placeholder="Link Nguồn (https://...)"
+                          value={platformUrl}
+                          onChange={(e) => setPlatformUrl(e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   {/* Cover Image Upload & URL Section */}
@@ -994,199 +1237,65 @@ export default function ExplorePostsPage() {
                       className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-800 rounded-xl text-xs text-gray-900 dark:text-slate-100 focus:outline-none"
                     />
 
-                    {/* Live Cover Preview */}
+                    {/* Live Cover Preview (Clean Square Format) */}
                     {newCoverImage && (
-                      <div className="relative h-36 rounded-xl overflow-hidden border border-purple-200 dark:border-purple-800 group shadow-xs">
-                        <img src={newCoverImage} alt="Cover Preview" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <button
-                            type="button"
-                            onClick={() => setNewCoverImage('')}
-                            className="px-3 py-1.5 bg-rose-600 text-white text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer"
-                          >
-                            <X size={14} /> Xóa ảnh bìa
-                          </button>
-                        </div>
-                        <span className="absolute bottom-2 left-2 px-2.5 py-1 rounded-md bg-black/60 text-white text-[10px] font-bold backdrop-blur-xs">
-                          Xem trước ảnh bìa
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Right Column (col-span-6): Attached Places List */}
-                <div className="lg:col-span-6 space-y-4 border-t lg:border-t-0 lg:border-l border-gray-100 dark:border-slate-800 pt-4 lg:pt-0 lg:pl-6">
-                  <div className="flex justify-between items-center border-b border-gray-100 dark:border-slate-800 pb-2">
-                    <h4 className="font-extrabold text-purple-700 dark:text-purple-400 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                      <MapPin size={15} /> 2. Danh sách Địa điểm đính kèm ({selectedPlaces.length})
-                    </h4>
-                    {selectedPlaces.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPlaces([])}
-                        className="text-xs font-bold text-rose-600 hover:underline cursor-pointer"
-                      >
-                        Xóa tất cả ({selectedPlaces.length})
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Search Place Input */}
-                  <div className="relative">
-                    <Search size={15} className="absolute left-3.5 top-3 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Gõ tên địa điểm để tìm kiếm từ DB (VD: Cần Thơ, Bánh Căn...)..."
-                      value={placeSearchQuery}
-                      onFocus={fetchPlaces}
-                      onChange={(e) => {
-                        setPlaceSearchQuery(e.target.value);
-                        fetchPlaces();
-                      }}
-                      className="w-full pl-9 pr-3.5 py-2.5 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-xl text-xs font-medium text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                    />
-                  </div>
-
-                  {/* Search Results Dropdown */}
-                  {placeSearchQuery.trim() !== '' && (
-                    <div className="max-h-56 overflow-y-auto border border-purple-200 dark:border-purple-900/50 rounded-2xl bg-white dark:bg-slate-900 divide-y divide-gray-100 dark:divide-slate-800 text-xs shadow-xl">
-                      {allPlaces
-                        .filter(
-                          (p) =>
-                            p.name?.toLowerCase().includes(placeSearchQuery.toLowerCase()) ||
-                            p.address?.toLowerCase().includes(placeSearchQuery.toLowerCase())
-                        )
-                        .slice(0, 15)
-                        .map((p) => {
-                          const isSelected = selectedPlaces.some((sp) => sp.id === p.id);
-                          return (
-                            <div
-                              key={p.id}
-                              className="p-2.5 flex items-center justify-between hover:bg-purple-50 dark:hover:bg-purple-950/30 transition-colors"
-                            >
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                {p.image ? (
-                                  <img src={p.image} alt={p.name} className="w-10 h-10 rounded-lg object-cover shrink-0 border border-gray-200" />
-                                ) : (
-                                  <div className="w-10 h-10 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center shrink-0 font-bold">
-                                    <MapPin size={18} />
-                                  </div>
-                                )}
-                                <div className="min-w-0">
-                                  <span className="font-bold text-gray-900 dark:text-slate-100 block truncate">{p.name}</span>
-                                  <span className="text-[10px] text-gray-400 block truncate">{p.address || p.description}</span>
-                                </div>
-                              </div>
-                              <button
-                                type="button"
-                                disabled={isSelected}
-                                onClick={() => {
-                                  if (!isSelected) {
-                                    setSelectedPlaces([...selectedPlaces, p]);
-                                    if (!newCoverImage && p.image) {
-                                      setNewCoverImage(p.image);
-                                    }
-                                  }
-                                }}
-                                className={`px-3 py-1 rounded-lg font-bold text-xs shrink-0 cursor-pointer ${isSelected
-                                  ? 'bg-gray-100 text-gray-400 dark:bg-slate-800 dark:text-slate-500 cursor-not-allowed'
-                                  : 'bg-purple-600 hover:bg-purple-500 text-white shadow-2xs'
-                                  }`}
-                              >
-                                {isSelected ? 'Đã chọn' : '+ Thêm'}
-                              </button>
-                            </div>
-                          );
-                        })}
-                    </div>
-                  )}
-
-                  {/* Selected Places List */}
-                  {selectedPlaces.length > 0 ? (
-                    <div className="space-y-2 pt-1 max-h-[380px] overflow-y-auto pr-1">
-                      {selectedPlaces.map((p, idx) => (
-                        <div
-                          key={p.id || idx}
-                          className="p-3 rounded-2xl border border-purple-200 dark:border-purple-900/40 bg-purple-50/40 dark:bg-purple-950/20 flex items-center justify-between text-xs transition-all hover:border-purple-300 shadow-2xs"
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span className="w-6 h-6 rounded-full bg-purple-600 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
-                              {idx + 1}
-                            </span>
-                            {p.image ? (
-                              <img src={p.image} alt={p.name} className="w-10 h-10 rounded-xl object-cover shrink-0 border border-purple-200" />
-                            ) : (
-                              <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center shrink-0 font-bold">
-                                <MapPin size={16} />
-                              </div>
-                            )}
-                            <div className="min-w-0">
-                              <span className="font-bold text-xs text-gray-900 dark:text-slate-100 truncate block">{p.name}</span>
-                              {p.rating && (
-                                <span className="text-amber-500 font-bold text-[11px]">⭐ {p.rating}</span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            {/* Quick Set Cover Button */}
-                            {p.image && newCoverImage !== p.image && (
-                              <button
-                                type="button"
-                                title="Đặt ảnh địa điểm này làm ảnh bìa bài Blog"
-                                onClick={() => {
-                                  setNewCoverImage(p.image);
-                                  showToast(`Đã lấy ảnh "${p.name}" làm ảnh bìa Blog!`, 'success');
-                                }}
-                                className="px-2.5 py-1 text-[11px] font-bold bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded-lg hover:bg-purple-100 transition-colors cursor-pointer"
-                              >
-                                🖼️ Đặt bìa
-                              </button>
-                            )}
-
-                            {/* Reorder Up / Down Buttons */}
-                            <div className="flex flex-col gap-0.5">
-                              <button
-                                type="button"
-                                disabled={idx === 0}
-                                onClick={() => moveSelectedPlace(idx, 'up')}
-                                className="p-1 text-gray-400 hover:text-purple-600 disabled:opacity-30 cursor-pointer"
-                              >
-                                <ArrowUp size={13} />
-                              </button>
-                              <button
-                                type="button"
-                                disabled={idx === selectedPlaces.length - 1}
-                                onClick={() => moveSelectedPlace(idx, 'down')}
-                                className="p-1 text-gray-400 hover:text-purple-600 disabled:opacity-30 cursor-pointer"
-                              >
-                                <ArrowDown size={13} />
-                              </button>
-                            </div>
-
-                            {/* Remove button */}
+                      <div className="flex items-center gap-4 pt-1">
+                        <div className="relative w-36 h-36 rounded-2xl overflow-hidden border-2 border-purple-300 dark:border-purple-800 group shadow-sm shrink-0 bg-slate-900">
+                          <img
+                            src={newCoverImage}
+                            alt="Cover Preview"
+                            className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105"
+                            onClick={() => setFullCoverPreviewUrl(newCoverImage)}
+                          />
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 p-2 pointer-events-none group-hover:pointer-events-auto">
                             <button
                               type="button"
-                              onClick={() => setSelectedPlaces(selectedPlaces.filter((sp) => sp.id !== p.id))}
-                              className="p-1 text-gray-400 hover:text-rose-600 transition-colors cursor-pointer"
+                              onClick={() => setFullCoverPreviewUrl(newCoverImage)}
+                              className="w-full py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer shadow-md transition-all"
                             >
-                              <X size={15} />
+                              <Eye size={13} /> Full ảnh
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setNewCoverImage('')}
+                              className="w-full py-1.5 bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold rounded-xl flex items-center justify-center gap-1 cursor-pointer shadow-md transition-all"
+                            >
+                              <X size={13} /> Xóa ảnh
                             </button>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-8 border border-dashed border-gray-200 dark:border-slate-800 rounded-2xl text-center text-gray-400 space-y-1">
-                      <MapPin size={28} className="mx-auto text-purple-300" />
-                      <p className="font-semibold text-xs text-gray-500">Chưa có địa điểm nào được đính kèm.</p>
-                      <p className="text-[11px] text-gray-400">Gõ từ khóa ở trên để chọn thêm địa điểm vào bài Blog.</p>
-                    </div>
-                  )}
-                </div>
-
+                        <div className="text-xs text-gray-600 dark:text-slate-300 space-y-1">
+                          <p className="font-bold text-purple-900 dark:text-purple-300 flex items-center gap-1">
+                            <Sparkles size={14} className="text-amber-500" /> Khung xem trước vuông (1:1)
+                          </p>
+                          <p className="text-[11px] text-gray-500 dark:text-slate-400">
+                            Ảnh bìa bài viết hiển thị chuẩn định dạng vuông bo góc hiện đại trên App & Web.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
               </div>
+              )}
+
+              {/* TAB 2: Địa điểm & Cấu trúc */}
+              {modalTab === 'places' && (
+              <div className="p-6 h-full">
+                <AttachedPlacesManager
+                  selectedPlaces={selectedPlaces}
+                  onSelectedPlacesChange={setSelectedPlaces}
+                  allPlaces={allPlaces}
+                  onFetchPlaces={fetchPlaces}
+                  destination={newDestination}
+                  coverImage={newCoverImage}
+                  onCoverImageChange={(url) => {
+                    setNewCoverImage(url);
+                    showToast('Đã đặt ảnh địa điểm làm ảnh bìa bài viết!', 'success');
+                  }}
+                />
+              </div>
+              )}
+
             </div>
 
             {/* Modal Footer */}
@@ -1204,7 +1313,7 @@ export default function ExplorePostsPage() {
                 className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-md cursor-pointer disabled:opacity-50"
               >
                 {(createLoading || uploadingCover) && <Loader2 size={15} className="animate-spin" />}
-                🚀 Lưu Bài Blog
+                {editingBlogId ? '🚀 Cập nhật Bài Blog' : '🚀 Lưu Bài Blog'}
               </button>
             </div>
 
@@ -1234,6 +1343,43 @@ export default function ExplorePostsPage() {
           </div>
         </div>
       )}
+      {/* Full Cover Image Preview Lightbox Modal */}
+      {fullCoverPreviewUrl && (
+        <div
+          className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[99999] p-4 animate-in fade-in duration-200 cursor-zoom-out"
+          onClick={() => setFullCoverPreviewUrl(null)}
+        >
+          <div
+            className="relative max-w-5xl max-h-[90vh] flex flex-col items-center justify-center pointer-events-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute -top-12 right-0 flex items-center gap-3 text-white">
+              <a
+                href={fullCoverPreviewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5"
+              >
+                <ExternalLink size={13} /> Mở tab mới
+              </a>
+              <button
+                type="button"
+                onClick={() => setFullCoverPreviewUrl(null)}
+                className="p-1.5 bg-white/20 hover:bg-rose-600 rounded-full text-white transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <img
+              src={fullCoverPreviewUrl}
+              alt="Full Cover Preview"
+              className="max-w-full max-h-[85vh] rounded-2xl object-contain shadow-2xl border border-white/20"
+            />
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
