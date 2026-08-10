@@ -289,15 +289,45 @@ export default function LocationsPage() {
     setUploadingDetailPhoto(true);
     setPhotoError(null);
     try {
-      showToast('Đang xử lý và tải ảnh lên Cloudinary...', 'success');
+      showToast('Đang xử lý và tải ảnh từ máy lên hệ thống...', 'success');
       const compressed = await compressImageFile(file, 1200, 0.85);
       if (compressed) {
         const cloudinaryUrl = await uploadImageToCloudinary(compressed, 'cloudmood_photos');
-        setNewPhoto((prev) => ({ ...prev, urlOriginal: cloudinaryUrl }));
-        showToast('Đã tải ảnh lên Cloudinary! Bấm "Thêm ảnh" để lưu.', 'success');
+        
+        if (modalType === 'create' || !currentPlace.id) {
+          const mockPhoto = {
+            id: Date.now(),
+            urlOriginal: cloudinaryUrl,
+            urlThumbnail: cloudinaryUrl,
+            caption: newPhoto.caption.trim() || null,
+            source: 'LOCAL',
+          };
+          setPlacePhotos((prev) => [mockPhoto, ...prev]);
+          setNewPhoto({ urlOriginal: '', urlThumbnail: '', caption: '' });
+          showToast('Đã thêm ảnh từ máy vào bộ sưu tập!', 'success');
+        } else {
+          const payload = {
+            urlOriginal: cloudinaryUrl,
+            urlThumbnail: cloudinaryUrl,
+            caption: newPhoto.caption.trim() || null,
+            source: 'LOCAL',
+          };
+          const res = await fetch(`/api/admin/places/${currentPlace.id}/photos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || 'Lỗi khi thêm hình ảnh.');
+
+          setPlacePhotos((prev) => [data, ...prev]);
+          setNewPhoto({ urlOriginal: '', urlThumbnail: '', caption: '' });
+          showToast('Thêm ảnh từ máy vào bộ sưu tập thành công!', 'success');
+        }
       }
     } catch (err: any) {
-      setPhotoError(err.message || 'Lỗi khi đọc file ảnh từ máy.');
+      setPhotoError(err.message || 'Lỗi khi tải/lưu file ảnh từ máy.');
+      showToast(err.message || 'Lỗi khi tải/lưu file ảnh từ máy.', 'error');
     } finally {
       setUploadingDetailPhoto(false);
       if (detailPhotoInputRef.current) detailPhotoInputRef.current.value = '';
@@ -574,6 +604,8 @@ export default function LocationsPage() {
         subCategories: currentPlace.subCategories || [],
         price: "",
         isApproved: currentPlace.isApproved === true || currentPlace.isApproved == null,
+        photos: placePhotos,
+        reviews: placeReviews,
       };
 
       if (modalType === 'create') {
@@ -2497,7 +2529,7 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                 </div>
 
                 {/* Footer Buttons for Tab 1 & Tab 2 */}
-                <div className="flex items-center justify-between pt-2.5 border-t border-gray-200 shrink-0 pr-14 sm:pr-20">
+                <div className="flex items-center justify-between pt-2.5 border-t border-gray-200 shrink-0">
                   <div>
                     {activeTab === 'basic' ? (
                       <button
@@ -2560,6 +2592,9 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
             {/* TAB 3: REVIEWS */}
             {activeTab === 'reviews' && (
               <div className="flex-1 overflow-y-auto p-4 lg:p-5 flex flex-col justify-between space-y-3">
+                {modalError && (
+                  <div className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-md p-2.5">{modalError}</div>
+                )}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start flex-1">
                   {/* Reviews List */}
                   <div className="lg:col-span-2 space-y-3">
@@ -2782,7 +2817,7 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                 </div>
 
                 {/* Footer Buttons for Tab 3: Reviews */}
-                <div className="flex items-center justify-between pt-2.5 border-t border-gray-200 shrink-0 pr-14 sm:pr-20">
+                <div className="flex items-center justify-between pt-2.5 border-t border-gray-200 shrink-0">
                   <button
                     type="button"
                     onClick={() => setActiveTab('extra')}
@@ -2790,13 +2825,38 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                   >
                     <ArrowLeft size={14} /> Trở lại Tab 2: Danh mục phụ
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('photos')}
-                    className="flex items-center gap-1.5 text-xs font-bold text-purple-600 hover:text-purple-800 hover:bg-purple-50 px-3 py-1.5 rounded-md transition-colors cursor-pointer"
-                  >
-                    Sang Tab 4: Bộ sưu tập Hình ảnh <ArrowRight size={14} />
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('photos')}
+                      className="flex items-center gap-1.5 text-xs font-bold text-purple-600 hover:text-purple-800 hover:bg-purple-50 px-3 py-1.5 rounded-md transition-colors cursor-pointer"
+                    >
+                      Sang Tab 4: Bộ sưu tập Hình ảnh <ArrowRight size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsModalOpen(false)}
+                      disabled={modalLoading}
+                      className="px-4 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 transition-colors text-xs font-bold cursor-pointer"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleSave(e as any)}
+                      disabled={modalLoading || uploadingThumbnail || uploadingDetailPhoto || uploadingAvatar}
+                      className="flex items-center gap-1.5 px-5 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md transition-colors text-xs font-extrabold cursor-pointer shadow-md"
+                    >
+                      {(modalLoading || uploadingThumbnail || uploadingDetailPhoto || uploadingAvatar) && <Loader2 size={15} className="animate-spin" />}
+                      {uploadingThumbnail || uploadingDetailPhoto || uploadingAvatar
+                        ? 'Đang tải ảnh...'
+                        : modalLoading
+                          ? 'Đang lưu...'
+                          : modalType === 'create'
+                            ? 'Tạo địa điểm mới'
+                            : 'Lưu thay đổi'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -2804,6 +2864,9 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
             {/* TAB 4: PHOTOS */}
             {activeTab === 'photos' && (
               <div className="flex-1 overflow-y-auto p-4 lg:p-5 flex flex-col justify-between space-y-3">
+                {modalError && (
+                  <div className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-md p-2.5">{modalError}</div>
+                )}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start flex-1">
                   {/* Photo Gallery List */}
                   <div className="lg:col-span-2 space-y-3">
@@ -2963,7 +3026,7 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                 </div>
 
                 {/* Footer Buttons for Tab 4: Photos */}
-                <div className="flex items-center justify-between pt-2.5 border-t border-gray-200 shrink-0 pr-14 sm:pr-20">
+                <div className="flex items-center justify-between pt-2.5 border-t border-gray-200 shrink-0">
                   <button
                     type="button"
                     onClick={() => setActiveTab('reviews')}
@@ -2971,13 +3034,31 @@ https://res.cloudinary.com/demo/image/upload/photo2.jpg,Món ăn đặc sản`}
                   >
                     <ArrowLeft size={14} /> Trở lại Tab 3: Quản lý Đánh giá
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-5 py-1.5 bg-gray-900 hover:bg-gray-800 text-white rounded-md transition-colors text-xs font-extrabold cursor-pointer shadow-md"
-                  >
-                    Hoàn tất
-                  </button>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsModalOpen(false)}
+                      disabled={modalLoading}
+                      className="px-4 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 transition-colors text-xs font-bold cursor-pointer"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleSave(e as any)}
+                      disabled={modalLoading || uploadingThumbnail || uploadingDetailPhoto || uploadingAvatar}
+                      className="flex items-center gap-1.5 px-5 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md transition-colors text-xs font-extrabold cursor-pointer shadow-md"
+                    >
+                      {(modalLoading || uploadingThumbnail || uploadingDetailPhoto || uploadingAvatar) && <Loader2 size={15} className="animate-spin" />}
+                      {uploadingThumbnail || uploadingDetailPhoto || uploadingAvatar
+                        ? 'Đang tải ảnh...'
+                        : modalLoading
+                          ? 'Đang lưu...'
+                          : modalType === 'create'
+                            ? 'Tạo địa điểm mới'
+                            : 'Lưu thay đổi'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
