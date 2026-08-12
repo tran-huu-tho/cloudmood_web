@@ -433,9 +433,9 @@ export default function LocationsPage() {
       }
     }
 
-    // Fallback if openingHours is not set or invalid
+    // Fallback if openingHours is not set or missing day arrays
+    const defaultTime = [place.openTime || '07:00', place.closeTime || '22:00'];
     if (!parsedOpeningHours || typeof parsedOpeningHours !== 'object') {
-      const defaultTime = [place.openTime || '07:00', place.closeTime || '23:00'];
       parsedOpeningHours = {
         monday: defaultTime,
         tuesday: defaultTime,
@@ -444,6 +444,17 @@ export default function LocationsPage() {
         friday: defaultTime,
         saturday: defaultTime,
         sunday: defaultTime,
+      };
+    } else {
+      parsedOpeningHours = {
+        ...parsedOpeningHours,
+        monday: Array.isArray(parsedOpeningHours.monday) ? parsedOpeningHours.monday : defaultTime,
+        tuesday: Array.isArray(parsedOpeningHours.tuesday) ? parsedOpeningHours.tuesday : defaultTime,
+        wednesday: Array.isArray(parsedOpeningHours.wednesday) ? parsedOpeningHours.wednesday : defaultTime,
+        thursday: Array.isArray(parsedOpeningHours.thursday) ? parsedOpeningHours.thursday : defaultTime,
+        friday: Array.isArray(parsedOpeningHours.friday) ? parsedOpeningHours.friday : defaultTime,
+        saturday: Array.isArray(parsedOpeningHours.saturday) ? parsedOpeningHours.saturday : defaultTime,
+        sunday: Array.isArray(parsedOpeningHours.sunday) ? parsedOpeningHours.sunday : defaultTime,
       };
     }
 
