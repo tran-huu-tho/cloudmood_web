@@ -16,6 +16,12 @@ const MapPicker = dynamic(() => import('@/components/admin/MapPicker'), {
   ),
 });
 
+const ENVIRONMENT_SUBCATEGORIES = [
+  'Hoạt động trong nhà',
+  'Hoạt động ngoài trời',
+  'Hoạt động ngoài trời và trong nhà',
+];
+
 const getCategoryBadgeStyle = (categoryId: number) => {
   const styles = [
     'bg-blue-50 text-blue-700 border-blue-200',      // Blue
@@ -1192,17 +1198,20 @@ export default function LocationsPage() {
 
   const allSubCategories = Array.from(
     new Set(
-      places.flatMap((p) => {
-        if (!p.subCategories) return [];
-        if (Array.isArray(p.subCategories)) return p.subCategories;
-        try {
-          if (typeof p.subCategories === 'string') {
-            const parsed = JSON.parse(p.subCategories);
-            if (Array.isArray(parsed)) return parsed;
-          }
-        } catch { }
-        return [];
-      })
+      [
+        ...ENVIRONMENT_SUBCATEGORIES,
+        ...places.flatMap((p) => {
+          if (!p.subCategories) return [];
+          if (Array.isArray(p.subCategories)) return p.subCategories;
+          try {
+            if (typeof p.subCategories === 'string') {
+              const parsed = JSON.parse(p.subCategories);
+              if (Array.isArray(parsed)) return parsed;
+            }
+          } catch { }
+          return [];
+        }),
+      ]
     )
   ).filter(Boolean) as string[];
 
